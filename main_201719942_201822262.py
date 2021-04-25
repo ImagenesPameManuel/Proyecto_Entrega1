@@ -1,7 +1,7 @@
 #Pamela Ramírez González #Código: 201822262
 #Manuel Gallegos Bustamante #Código: 201719942
-#Sabina Nieto Ramón #Código: 201822262
-#Nicolás Mora #Código: 201822262
+#Sabina Nieto Ramón #Código: 201820051
+#Nicolás Mora Carrizosa #Código: 201821509
 #Análisis y procesamiento de imágenes: Proyecto Final Entrega1
 #Se importan librerías que se utilizarán para el desarrollo del laboratorio
 from skimage.filters import threshold_otsu
