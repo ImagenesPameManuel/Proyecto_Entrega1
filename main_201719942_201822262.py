@@ -21,8 +21,8 @@ import os
 import skimage.morphology as morfo
 import glob
 ##
-
-imagenes=glob.glob(os.path.join("BasedeDatos","preprocessed_images","*.jpg"))
+imagenes=glob.glob(os.path.join("BasedeDatos","Entrenamiento","Entrena1","*.jpg"))
+#imagenes=glob.glob(os.path.join("BasedeDatos","preprocessed_images","*.jpg"))
 matriz_datos=[]
 archivo=open(os.path.join("BasedeDatos","full_df.csv"),mode="r")
 titulos=archivo.readline().split(",")
@@ -48,34 +48,47 @@ while len(linea)>0:
 archivo.close()
 select_rand=np.random.randint(1,len(matriz_datos)-1,4)
 #print(select_rand)
-selected={}
+selected1={}
+selected2={}
 cont=1
-for i in len(matriz_datos):
-    select_img=matriz_datos[i][-1]
-    for imagen in imagenes:
-        separador=imagen[len("BasedeDatos"):][0]
-        file_imagen=imagen.split(separador)[-1]
-        if file_imagen==select_img:
-            anotacion=matriz_datos[i][-3][0]
-            print(anotacion)
-            carga=io.imread(imagen)
-            selected[cont] = [carga, anotacion]
-            print(select_img)
-            cont += 1
-        elif file_imagen=="300_left.jpg":
-            circulo_temp=io.imread(imagen)
-            filtrado = cv2.medianBlur(circulo_temp, 3)
-            grises = rgb2gray(filtrado)
-            L = np.amax(grises)
-            neg = grises.copy()
-            for i in range(len(grises)):
-                for j in range(len(grises[0])):
-                    formula = (L) - grises[i][j]
-                    neg[i][j] = formula
-            gamma = exposure.adjust_gamma(neg, gamma=2)
-            # print(len(gamma))
-            umbral = threshold_otsu(gamma)
-            circulo_temp = gamma < umbral
+for imagen in imagenes:
+    separador = imagen[len("BasedeDatos"):][0]
+    file_imagen = imagen.split(separador)[-1]
+    for i in range(1,len(matriz_datos)):
+        select_img=matriz_datos[i][-1]
+        if cont<len(imagenes)/2:
+            if file_imagen==select_img:
+                anotacion=matriz_datos[i][-3][0]
+                #print(anotacion)
+                carga=io.imread(imagen)
+                selected1[cont] = [carga, anotacion]
+                #print(select_img)
+                cont += 1
+        else:
+            if file_imagen==select_img:
+                anotacion=matriz_datos[i][-3][0]
+                #print(anotacion)
+                carga=io.imread(imagen)
+                selected2[cont] = [carga, anotacion]
+                #print(select_img)
+                cont += 1
+        #if file_imagen=="300_left.jpg":
+print(len(selected1),len(selected2))
+##
+circulo_temp=io.imread(os.path.join('BasedeDatos',"preprocessed_images", "300_left.jpg"))
+filtrado = cv2.medianBlur(circulo_temp, 3)
+grises = rgb2gray(filtrado)
+L = np.amax(grises)
+neg = grises.copy()
+for i in range(len(grises)):
+    for j in range(len(grises[0])):
+        formula = (L) - grises[i][j]
+        neg[i][j] = formula
+gamma = exposure.adjust_gamma(neg, gamma=2)
+# print(len(gamma))
+umbral = threshold_otsu(gamma)
+circulo_temp = gamma < umbral
+print(len(selected1),len(selected2))
 ##
 select_rand=np.random.randint(1,len(matriz_datos)-1,4)
 print(select_rand)
@@ -100,27 +113,27 @@ for i in select_rand:
             #print(imagen)
             #print("__")
             cont += 1
-        elif file_imagen=="300_left.jpg":
-            circulo_temp=io.imread(imagen)
-            filtrado = cv2.medianBlur(circulo_temp, 3)
-            grises = rgb2gray(filtrado)
-            L = np.amax(grises)
-            neg = grises.copy()
-            for i in range(len(grises)):
-                for j in range(len(grises[0])):
-                    formula = (L) - grises[i][j]
-                    neg[i][j] = formula
-                    """if formula<0:
-                        neg[i][j]=0
-                    else:
-                        neg[i][j] = formula"""
-            # print(neg)
-            # gamma=neg^(1/2)#np.power(neg,1/2)#.clip(0,255).astype(np.uint8)
+elif file_imagen=="300_left.jpg":
+    circulo_temp=io.imread(imagen)
+    filtrado = cv2.medianBlur(circulo_temp, 3)
+    grises = rgb2gray(filtrado)
+    L = np.amax(grises)
+    neg = grises.copy()
+    for i in range(len(grises)):
+        for j in range(len(grises[0])):
+            formula = (L) - grises[i][j]
+            neg[i][j] = formula
+            """if formula<0:
+                neg[i][j]=0
+            else:
+                neg[i][j] = formula"""
+    # print(neg)
+    # gamma=neg^(1/2)#np.power(neg,1/2)#.clip(0,255).astype(np.uint8)
 
-            gamma = exposure.adjust_gamma(neg, gamma=2)
-            # print(len(gamma))
-            umbral = threshold_otsu(gamma)
-            circulo_temp = gamma < umbral
+    gamma = exposure.adjust_gamma(neg, gamma=2)
+    # print(len(gamma))
+    umbral = threshold_otsu(gamma)
+    circulo_temp = gamma < umbral
 
 
 plt.figure()
@@ -265,6 +278,7 @@ circ=np.reshape( io.imread(os.path.join('BasedeDatos', 'circ.png')),512) # se im
 plt.imshow(circ)
 ##print(len(circ),len(circ[0]))
 def idea_miopia_neg(image):
+    image=np.resize(image,(512,512))
     filtrado = cv2.medianBlur(image, 3)
     grises = rgb2gray(filtrado)
     L=np.amax(grises)
@@ -310,6 +324,7 @@ def idea_miopia_neg(image):
     else:
         prediccion = "M"
     return vasos, prediccion #recorte#neg#grad#gamma#
+##
 circulo=idea_miopia_neg(selected[3][0])
 print(np.set_printoptions())
 """#circulo_temp=
@@ -349,9 +364,10 @@ TP = 0
 TN = 0
 FP = 0
 FN = 0
-for i in selected:
-    img_etrenamiento = selected[i][0]
-    img_anotacion = selected[i][1]
+##
+for i in selected1:
+    img_etrenamiento = selected1[i][0]
+    img_anotacion = selected1[i][1]
     prediccion_entrena = idea_miopia_neg(img_etrenamiento)[1]
     if prediccion_entrena == "M" and img_anotacion == "M":
         TP += 1
@@ -361,3 +377,18 @@ for i in selected:
         FN += 1
     else:
         TN += 1
+
+for i in selected2:
+    img_etrenamiento = selected2[i][0]
+    img_anotacion = selected2[i][1]
+    prediccion_entrena = idea_miopia_neg(img_etrenamiento)[1]
+    if prediccion_entrena == "M" and img_anotacion == "M":
+        TP += 1
+    elif prediccion_entrena == "M" and img_anotacion != "M":
+        FP += 1
+    elif prediccion_entrena != "M" and img_anotacion == "M":
+        FN += 1
+    else:
+        TN += 1
+##
+prec=
