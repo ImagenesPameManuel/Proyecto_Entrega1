@@ -277,8 +277,28 @@ plt.show()
 circ=np.reshape( io.imread(os.path.join('BasedeDatos', 'circ.png')),512) # se importa la imagen de prueba
 plt.imshow(circ)
 ##print(len(circ),len(circ[0]))
-def idea_miopia_neg(image):
-    image=np.resize(image,(512,512))
+def idea_miopia_neg(image1):
+    #image=np.resize(image,(512,512))
+    #image = image1.resize((512, 512))
+    bin_image = cv2.resize(image1[:, :, 1], dsize=(512,512))
+    umbral = threshold_otsu(bin_image)
+    filtrado = cv2.medianBlur(bin_image, 3)
+    grises = rgb2gray(filtrado)
+    L = np.amax(grises)
+    neg = grises.copy()
+    for i in range(len(grises)):
+        for j in range(len(grises[0])):
+            formula = (L) - grises[i][j]
+            neg[i][j] = formula
+    gamma = exposure.adjust_gamma(neg, gamma=2)
+    # print(len(gamma))
+    umbral = threshold_otsu(gamma)
+    circulo_temp = gamma < umbral
+
+
+
+    #bin_image=cv2.resize(bin_image>umbral, dsize=(512,512))
+    image=cv2.resize(image1, dsize=(512,512))
     filtrado = cv2.medianBlur(image, 3)
     grises = rgb2gray(filtrado)
     L=np.amax(grises)
@@ -297,6 +317,8 @@ def idea_miopia_neg(image):
     gamma=exposure.adjust_gamma(neg,gamma=2)
     #print(len(gamma))
     gamma=gamma*circulo_temp
+
+    #gamma #= gamma * bin_image
     umbral = threshold_otsu(gamma)
     vasos = gamma > umbral
     recorte=np.delete(gamma,slice(75),axis=1)
@@ -319,7 +341,8 @@ def idea_miopia_neg(image):
     dilatacion = morfo.dilation(grises)
     erosion = morfo.erosion(grises)
     grad = dilatacion - erosion
-    if np.count_nonzero(vasos) > 0.95 * len(vasos):
+    #bin_image = segmenta.watershed(grad, markers=marks, watershed_line=True)
+    if np.count_nonzero(vasos) > 0.90 * (len(vasos)*len(vasos[0])):
         prediccion = "no hay"
     else:
         prediccion = "M"
@@ -331,31 +354,31 @@ print(np.set_printoptions())
 for c in range(len(circulo)):
     for cj in range(len(circulo[0])):
         circulo_temp[c][cj]=circulo[c][cj]"""
-
+##
 plt.figure()
 plt.subplot(4,2,1)
-plt.imshow(idea_miopia_neg(selected[1][0]),cmap="gray")
-#plt.axis("off")
+plt.imshow(idea_miopia_neg(selected1[11][0])[0],cmap="gray")
+plt.axis("off")
 plt.subplot(4,2,2)
-plt.text(0.5, 0.5, selected[1][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
+plt.text(0.5, 0.5, selected1[11][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
 plt.axis("off")
 plt.subplot(4,2,3)
-plt.imshow(idea_miopia_neg(selected[2][0]),cmap="gray")
+plt.imshow(idea_miopia_neg(selected1[12][0])[0],cmap="gray")
 plt.axis("off")
 plt.subplot(4,2,4)
-plt.text(0.5, 0.5, selected[2][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
+plt.text(0.5, 0.5, selected1[12][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
 plt.axis("off")
 plt.subplot(4,2,5)
-plt.imshow(idea_miopia_neg(selected[3][0]),cmap="gray")
+plt.imshow(idea_miopia_neg(selected1[13][0])[0],cmap="gray")
 plt.axis("off")
 plt.subplot(4,2,6)
-plt.text(0.5, 0.5,selected[3][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
+plt.text(0.5, 0.5,selected1[13][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
 plt.axis("off")
 plt.subplot(4,2,7)
-plt.imshow(idea_miopia_neg(selected[4][0]),cmap="gray")
+plt.imshow(idea_miopia_neg(selected1[18][0])[0],cmap="gray")
 plt.axis("off")
 plt.subplot(4,2,8)
-plt.text(0.5, 0.5, selected[4][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
+plt.text(0.5, 0.5, selected1[18][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
 plt.axis("off")
 plt.show()
 
@@ -364,19 +387,22 @@ TP = 0
 TN = 0
 FP = 0
 FN = 0
-##
+
 for i in selected1:
     img_etrenamiento = selected1[i][0]
     img_anotacion = selected1[i][1]
     prediccion_entrena = idea_miopia_neg(img_etrenamiento)[1]
     if prediccion_entrena == "M" and img_anotacion == "M":
         TP += 1
+        #plt.imshow(idea_miopia_neg(img_etrenamiento)[0])
+        #break
     elif prediccion_entrena == "M" and img_anotacion != "M":
         FP += 1
     elif prediccion_entrena != "M" and img_anotacion == "M":
         FN += 1
     else:
         TN += 1
+
 
 for i in selected2:
     img_etrenamiento = selected2[i][0]
