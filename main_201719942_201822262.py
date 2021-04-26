@@ -8,6 +8,7 @@ from skimage.filters import threshold_otsu
 import nibabel
 from scipy.io import loadmat
 #import requests
+from scipy.ndimage import minimum_filter
 from skimage.color import rgb2gray
 import skimage.segmentation as segmenta
 import numpy as np
@@ -68,6 +69,27 @@ for i in select_rand:
             #print(imagen)
             #print("__")
             cont += 1
+        elif file_imagen=="300_left.jpg":
+            circulo_temp=io.imread(imagen)
+            filtrado = cv2.medianBlur(circulo_temp, 3)
+            grises = rgb2gray(filtrado)
+            L = np.amax(grises)
+            neg = grises.copy()
+            for i in range(len(grises)):
+                for j in range(len(grises[0])):
+                    formula = (L) - grises[i][j]
+                    neg[i][j] = formula
+                    """if formula<0:
+                        neg[i][j]=0
+                    else:
+                        neg[i][j] = formula"""
+            # print(neg)
+            # gamma=neg^(1/2)#np.power(neg,1/2)#.clip(0,255).astype(np.uint8)
+
+            gamma = exposure.adjust_gamma(neg, gamma=2)
+            # print(len(gamma))
+            umbral = threshold_otsu(gamma)
+            circulo_temp = gamma < umbral
 
 plt.figure()
 plt.subplot(4,2,1)
@@ -207,6 +229,9 @@ plt.text(0.5, 0.5, selected[4][1], horizontalalignment="center",verticalalignmen
 plt.axis("off")
 plt.show()
 ##
+circ=np.reshape( io.imread(os.path.join('BasedeDatos', 'circ.png')),512) # se importa la imagen de prueba
+plt.imshow(circ)
+##print(len(circ),len(circ[0]))
 def idea_miopia_neg(image):
     filtrado = cv2.medianBlur(image, 3)
     grises = rgb2gray(filtrado)
@@ -222,25 +247,44 @@ def idea_miopia_neg(image):
                 neg[i][j] = formula"""
     #print(neg)
     #gamma=neg^(1/2)#np.power(neg,1/2)#.clip(0,255).astype(np.uint8)
+
     gamma=exposure.adjust_gamma(neg,gamma=2)
+    #print(len(gamma))
+    gamma=gamma*circulo_temp
+    umbral = threshold_otsu(gamma)
+    vasos = gamma > umbral
+    recorte=np.delete(gamma,slice(75),axis=1)
+    recorte = np.delete(recorte, slice(75), axis=0)
+    recorte = np.delete(recorte, slice(len(recorte)-75,len(recorte)), axis=0)
+    recorte = np.delete(recorte, slice(len(recorte[0]) - 75, len(recorte[0])), axis=1)
+    #recorte = np.delete(recorte, slice(5), axis=1)
+    #gamma=np.where(gamma==np.amax(gamma), 0, gamma)
+    #gamma = np.where(gamma == np.amax(gamma), 0, gamma)
     #neg_color=cv2.cvtColor(gamma, cv2.COLOR_GRAY2RGB)
     #I_R=neg_color[:,:,0]
     #I_G=neg_color[:,:,1]
     #I_Q=I_R/(I_G+1)
     #umbral = threshold_otsu(I_Q)
     #vasos = I_Q < umbral
-    top_hat=morfo.white_tophat(gamma)
-    umbral=threshold_otsu(gamma)
-    vasos=gamma<umbral
-
+    minimo=minimum_filter(gamma,size=(len(gamma),len(gamma[0])))
+    top_hat=morfo.white_tophat(gamma,morfo.square(7))
+    #umbral=threshold_otsu(recorte)
+   # vasos=recorte>umbral
     dilatacion = morfo.dilation(grises)
     erosion = morfo.erosion(grises)
     grad = dilatacion - erosion
-    return top_hat#gamma#vasos#neg#grad
+    return gamma#vasos#recorte#neg#grad
+circulo=idea_miopia_neg(selected[3][0])
+print(np.set_printoptions())
+"""#circulo_temp=
+for c in range(len(circulo)):
+    for cj in range(len(circulo[0])):
+        circulo_temp[c][cj]=circulo[c][cj]"""
+
 plt.figure()
 plt.subplot(4,2,1)
 plt.imshow(idea_miopia_neg(selected[1][0]),cmap="gray")
-plt.axis("off")
+#plt.axis("off")
 plt.subplot(4,2,2)
 plt.text(0.5, 0.5, selected[1][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
 plt.axis("off")
