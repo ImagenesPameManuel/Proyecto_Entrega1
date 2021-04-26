@@ -391,4 +391,7 @@ for i in selected2:
     else:
         TN += 1
 ##
-prec=
+prec=TP/(TP+FP)
+cob=TP/(TP+FN)
+print(prec,cob)
+
