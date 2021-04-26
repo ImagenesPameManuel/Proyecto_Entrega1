@@ -214,20 +214,29 @@ def idea_miopia_neg(image):
     neg=grises.copy()
     for i in range(len(grises)):
         for j in range(len(grises[0])):
-            formula=(L-1)-grises[i][j]
-            if formula<0:
+            formula=(L)-grises[i][j]
+            neg[i][j] = formula
+            """if formula<0:
                 neg[i][j]=0
             else:
-                neg[i][j] = formula
+                neg[i][j] = formula"""
+    #print(neg)
     #gamma=neg^(1/2)#np.power(neg,1/2)#.clip(0,255).astype(np.uint8)
-    gamma=exposure.adjust_gamma(neg,gamma=1/2)
-    #grises=image[:,:,1]
-    #umbral=threshold_otsu(grises)
-    #grises=grises>umbral
+    gamma=exposure.adjust_gamma(neg,gamma=2)
+    #neg_color=cv2.cvtColor(gamma, cv2.COLOR_GRAY2RGB)
+    #I_R=neg_color[:,:,0]
+    #I_G=neg_color[:,:,1]
+    #I_Q=I_R/(I_G+1)
+    #umbral = threshold_otsu(I_Q)
+    #vasos = I_Q < umbral
+    top_hat=morfo.white_tophat(gamma)
+    umbral=threshold_otsu(gamma)
+    vasos=gamma<umbral
+
     dilatacion = morfo.dilation(grises)
     erosion = morfo.erosion(grises)
     grad = dilatacion - erosion
-    return gamma#grad
+    return top_hat#gamma#vasos#neg#grad
 plt.figure()
 plt.subplot(4,2,1)
 plt.imshow(idea_miopia_neg(selected[1][0]),cmap="gray")
