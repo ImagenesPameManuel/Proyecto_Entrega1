@@ -47,6 +47,37 @@ while len(linea)>0:
     linea=archivo.readline()
 archivo.close()
 select_rand=np.random.randint(1,len(matriz_datos)-1,4)
+#print(select_rand)
+selected={}
+cont=1
+for i in len(matriz_datos):
+    select_img=matriz_datos[i][-1]
+    for imagen in imagenes:
+        separador=imagen[len("BasedeDatos"):][0]
+        file_imagen=imagen.split(separador)[-1]
+        if file_imagen==select_img:
+            anotacion=matriz_datos[i][-3][0]
+            print(anotacion)
+            carga=io.imread(imagen)
+            selected[cont] = [carga, anotacion]
+            print(select_img)
+            cont += 1
+        elif file_imagen=="300_left.jpg":
+            circulo_temp=io.imread(imagen)
+            filtrado = cv2.medianBlur(circulo_temp, 3)
+            grises = rgb2gray(filtrado)
+            L = np.amax(grises)
+            neg = grises.copy()
+            for i in range(len(grises)):
+                for j in range(len(grises[0])):
+                    formula = (L) - grises[i][j]
+                    neg[i][j] = formula
+            gamma = exposure.adjust_gamma(neg, gamma=2)
+            # print(len(gamma))
+            umbral = threshold_otsu(gamma)
+            circulo_temp = gamma < umbral
+##
+select_rand=np.random.randint(1,len(matriz_datos)-1,4)
 print(select_rand)
 selected={}
 cont=1
@@ -90,6 +121,7 @@ for i in select_rand:
             # print(len(gamma))
             umbral = threshold_otsu(gamma)
             circulo_temp = gamma < umbral
+
 
 plt.figure()
 plt.subplot(4,2,1)
@@ -273,7 +305,11 @@ def idea_miopia_neg(image):
     dilatacion = morfo.dilation(grises)
     erosion = morfo.erosion(grises)
     grad = dilatacion - erosion
-    return gamma#vasos#recorte#neg#grad
+    if np.count_nonzero(vasos) > 0.95 * len(vasos):
+        prediccion = "no hay"
+    else:
+        prediccion = "M"
+    return vasos, prediccion #recorte#neg#grad#gamma#
 circulo=idea_miopia_neg(selected[3][0])
 print(np.set_printoptions())
 """#circulo_temp=
@@ -307,3 +343,21 @@ plt.subplot(4,2,8)
 plt.text(0.5, 0.5, selected[4][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
 plt.axis("off")
 plt.show()
+
+##
+TP = 0
+TN = 0
+FP = 0
+FN = 0
+for i in selected:
+    img_etrenamiento = selected[i][0]
+    img_anotacion = selected[i][1]
+    prediccion_entrena = idea_miopia_neg(img_etrenamiento)[1]
+    if prediccion_entrena == "M" and img_anotacion == "M":
+        TP += 1
+    elif prediccion_entrena == "M" and img_anotacion != "M":
+        FP += 1
+    elif prediccion_entrena != "M" and img_anotacion == "M":
+        FN += 1
+    else:
+        TN += 1
