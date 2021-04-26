@@ -15,6 +15,7 @@ import cv2
 import matplotlib.pyplot as plt
 from skimage.filters import threshold_otsu
 import skimage.io as io
+from skimage import exposure
 import os
 import skimage.morphology as morfo
 import glob
@@ -134,7 +135,7 @@ def idea_water(image):
     umbral=threshold_otsu(espacio_b)
     marks=bin_image>umbral
     marks=morfo.erosion(marks)
-    
+
     #bin_image = espacio_b < umbral
     #marks = morfo.h_minima(grises, 40)
     dilatacion = morfo.dilation(grises)
@@ -200,6 +201,54 @@ plt.text(0.5, 0.5,selected[3][1], horizontalalignment="center",verticalalignment
 plt.axis("off")
 plt.subplot(4,2,7)
 plt.imshow(preprocesamiento_binario(selected[4][0]),cmap="gray")
+plt.axis("off")
+plt.subplot(4,2,8)
+plt.text(0.5, 0.5, selected[4][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
+plt.axis("off")
+plt.show()
+##
+def idea_miopia_neg(image):
+    filtrado = cv2.medianBlur(image, 3)
+    grises = rgb2gray(filtrado)
+    L=np.amax(grises)
+    neg=grises.copy()
+    for i in range(len(grises)):
+        for j in range(len(grises[0])):
+            formula=(L-1)-grises[i][j]
+            if formula<0:
+                neg[i][j]=0
+            else:
+                neg[i][j] = formula
+    #gamma=neg^(1/2)#np.power(neg,1/2)#.clip(0,255).astype(np.uint8)
+    gamma=exposure.adjust_gamma(neg,gamma=1/2)
+    #grises=image[:,:,1]
+    #umbral=threshold_otsu(grises)
+    #grises=grises>umbral
+    dilatacion = morfo.dilation(grises)
+    erosion = morfo.erosion(grises)
+    grad = dilatacion - erosion
+    return gamma#grad
+plt.figure()
+plt.subplot(4,2,1)
+plt.imshow(idea_miopia_neg(selected[1][0]),cmap="gray")
+plt.axis("off")
+plt.subplot(4,2,2)
+plt.text(0.5, 0.5, selected[1][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
+plt.axis("off")
+plt.subplot(4,2,3)
+plt.imshow(idea_miopia_neg(selected[2][0]),cmap="gray")
+plt.axis("off")
+plt.subplot(4,2,4)
+plt.text(0.5, 0.5, selected[2][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
+plt.axis("off")
+plt.subplot(4,2,5)
+plt.imshow(idea_miopia_neg(selected[3][0]),cmap="gray")
+plt.axis("off")
+plt.subplot(4,2,6)
+plt.text(0.5, 0.5,selected[3][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
+plt.axis("off")
+plt.subplot(4,2,7)
+plt.imshow(idea_miopia_neg(selected[4][0]),cmap="gray")
 plt.axis("off")
 plt.subplot(4,2,8)
 plt.text(0.5, 0.5, selected[4][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
