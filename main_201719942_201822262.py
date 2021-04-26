@@ -21,7 +21,7 @@ import os
 import skimage.morphology as morfo
 import glob
 ##
-imagenes=glob.glob(os.path.join("BasedeDatos","Entrenamiento","Entrena1","*.jpg"))
+imagenes=glob.glob(os.path.join("BasedeDatos","Entrenamiento","Entrena2","*.jpg"))
 #imagenes=glob.glob(os.path.join("BasedeDatos","preprocessed_images","*.jpg"))
 matriz_datos=[]
 archivo=open(os.path.join("BasedeDatos","full_df.csv"),mode="r")
@@ -360,25 +360,29 @@ plt.subplot(4,2,1)
 plt.imshow(idea_miopia_neg(selected1[11][0])[0],cmap="gray")
 plt.axis("off")
 plt.subplot(4,2,2)
-plt.text(0.5, 0.5, selected1[11][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
+#plt.text(0.5, 0.5, selected1[11][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
+plt.imshow(selected1[11][0],cmap="gray")
 plt.axis("off")
 plt.subplot(4,2,3)
 plt.imshow(idea_miopia_neg(selected1[12][0])[0],cmap="gray")
 plt.axis("off")
 plt.subplot(4,2,4)
-plt.text(0.5, 0.5, selected1[12][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
+#plt.text(0.5, 0.5, selected1[12][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
+plt.imshow(selected1[12][0],cmap="gray")
 plt.axis("off")
 plt.subplot(4,2,5)
-plt.imshow(idea_miopia_neg(selected1[13][0])[0],cmap="gray")
+plt.imshow(idea_miopia_neg(selected1[14][0])[0],cmap="gray")
 plt.axis("off")
 plt.subplot(4,2,6)
-plt.text(0.5, 0.5,selected1[13][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
+#plt.text(0.5, 0.5,selected1[13][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
+plt.imshow(selected1[14][0],cmap="gray")
 plt.axis("off")
 plt.subplot(4,2,7)
 plt.imshow(idea_miopia_neg(selected1[18][0])[0],cmap="gray")
 plt.axis("off")
 plt.subplot(4,2,8)
-plt.text(0.5, 0.5, selected1[18][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
+#plt.text(0.5, 0.5, selected1[18][1], horizontalalignment="center",verticalalignment="center",fontsize="xx-large",fontweight="semibold")
+plt.imshow(selected1[18][0],cmap="gray")
 plt.axis("off")
 plt.show()
 
@@ -387,7 +391,7 @@ TP = 0
 TN = 0
 FP = 0
 FN = 0
-
+##
 for i in selected1:
     img_etrenamiento = selected1[i][0]
     img_anotacion = selected1[i][1]
