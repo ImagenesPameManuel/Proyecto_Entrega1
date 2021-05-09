@@ -13,6 +13,7 @@ from skimage.color import rgb2gray
 import skimage.segmentation as segmenta
 import numpy as np
 import cv2
+from  PIL import Image
 import matplotlib.pyplot as plt
 from skimage.filters import threshold_otsu
 import skimage.io as io
@@ -20,7 +21,65 @@ from skimage import exposure
 import os
 import skimage.morphology as morfo
 import glob
+
+def charge_imgs():
+    matriz_imgs=[]
+    matriz_anota=[]
+    imagenes = glob.glob(os.path.join("BasedeDatos", "Entrenamiento", "Entrena1", "*.jpg"))
+    matriz_datos = []
+    archivo = open(os.path.join("BasedeDatos", "full_df.csv"), mode="r")
+    titulos = archivo.readline().split(",")
+    matriz_datos.append(titulos)
+    linea = archivo.readline()
+    while len(linea) > 0:
+        linea = linea[1:-2].split(",")
+        # linea[0]=int(linea[0])
+        linea[1] = int(linea[1])
+        linea[-9] = linea[-9][-1:]
+        linea[-2] = linea[-2][:2]
+        lisa = ""
+        for i in range(-9, -1):
+            lisa += linea[i]
+        lisa = lisa.replace(" ", "")
+        del linea[-9:-1]
+        unir = np.array([list(lisa)])
+        linea[-1:-1] = unir
+        linea[-3] = list(linea[-3][2:-2])
+        # print(linea)
+        matriz_datos.append(linea)
+        linea = archivo.readline()
+    archivo.close()
+    cont = 1
+    for imagen in imagenes:
+        separador = imagen[len("BasedeDatos"):][0]
+        file_imagen = imagen.split(separador)[-1]
+        if cont < 2:#len(imagenes) / 16:
+            for i in range(1, len(matriz_datos)):
+                select_img = matriz_datos[i][-1]
+                anotacion = matriz_datos[i][-3][0]
+                # print(anotacion)
+                carga = io.imread(imagen)
+                matriz_anota.append(anotacion)
+                matriz_imgs.append(carga)
+                cont += 1
+                #selected1[cont] = [carga, anotacion]
+                # print(select_img)
+    return matriz_imgs,matriz_anota
+
 ##
+def crop_image(image):
+    bin_image = image[:, :, 1]
+    umbral = threshold_otsu(bin_image)
+    bin_image=bin_image<umbral
+    plt.figure()
+    plt.imshow(bin_image)
+    plt.show()
+cargas=charge_imgs()[0]
+#print(cargas)
+crop_image(cargas[0])
+##
+
+
 imagenes=glob.glob(os.path.join("BasedeDatos","Entrenamiento","Entrena2","*.jpg"))
 #imagenes=glob.glob(os.path.join("BasedeDatos","preprocessed_images","*.jpg"))
 matriz_datos=[]
@@ -424,4 +483,3 @@ for i in selected2:
 prec=TP/(TP+FP)
 cob=TP/(TP+FN)
 print(prec,cob)
-
