@@ -21,11 +21,9 @@ from skimage import exposure
 import os
 import skimage.morphology as morfo
 import glob
-
+##
 def charge_imgs():
-    matriz_imgs=[]
-    matriz_anota=[]
-    imagenes = glob.glob(os.path.join("BasedeDatos", "Entrenamiento", "Entrena1", "*.jpg"))
+    imagenes = glob.glob(os.path.join("BasedeDatos", "Entrenamiento", "Entrena2", "*.jpg"))
     matriz_datos = []
     archivo = open(os.path.join("BasedeDatos", "full_df.csv"), mode="r")
     titulos = archivo.readline().split(",")
@@ -49,22 +47,33 @@ def charge_imgs():
         matriz_datos.append(linea)
         linea = archivo.readline()
     archivo.close()
+    selected1 = {}
+    selected2 = {}
     cont = 1
     for imagen in imagenes:
         separador = imagen[len("BasedeDatos"):][0]
         file_imagen = imagen.split(separador)[-1]
-        if cont < 2:#len(imagenes) / 16:
-            for i in range(1, len(matriz_datos)):
-                select_img = matriz_datos[i][-1]
-                anotacion = matriz_datos[i][-3][0]
-                # print(anotacion)
-                carga = io.imread(imagen)
-                matriz_anota.append(anotacion)
-                matriz_imgs.append(carga)
-                cont += 1
-                #selected1[cont] = [carga, anotacion]
-                # print(select_img)
-    return matriz_imgs,matriz_anota
+        for i in range(1, len(matriz_datos)):
+            select_img = matriz_datos[i][-1]
+            if cont < len(imagenes) / 2:
+                if file_imagen == select_img:
+                    print(cont)
+                    anotacion = matriz_datos[i][-3][0]
+                    # print(anotacion)
+                    carga = io.imread(imagen)
+                    selected1[cont] = [carga, anotacion]
+                    # print(select_img)
+                    cont += 1
+            else:
+                if file_imagen == select_img:
+                    anotacion = matriz_datos[i][-3][0]
+                    # print(anotacion)
+                    carga = io.imread(imagen)
+                    selected2[cont] = [carga, anotacion]
+                    # print(select_img)
+                    cont += 1
+    print(len(selected1))
+    return selected1,selected2
 
 ##
 def crop_image(image):
@@ -72,11 +81,15 @@ def crop_image(image):
     umbral = threshold_otsu(bin_image)
     bin_image=bin_image<umbral
     plt.figure()
-    plt.imshow(bin_image)
+    plt.imshow(bin_image,cmap="gray")
     plt.show()
 cargas=charge_imgs()[0]
-#print(cargas)
-crop_image(cargas[0])
+print(len(cargas))
+##
+for i in cargas:
+    #print(cargas)
+    crop_image(cargas[i][0])
+    break
 ##
 
 
