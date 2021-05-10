@@ -57,7 +57,7 @@ def charge_imgs():
             select_img = matriz_datos[i][-1]
             if cont < len(imagenes) / 2:
                 if file_imagen == select_img:
-                    print(cont)
+                    #print(cont)
                     anotacion = matriz_datos[i][-3][0]
                     # print(anotacion)
                     carga = io.imread(imagen)
@@ -72,17 +72,18 @@ def charge_imgs():
                     selected2[cont] = [carga, anotacion]
                     # print(select_img)
                     cont += 1
-    print(len(selected1))
+    #print(len(selected1))
     return selected1,selected2
 
 ##
 def crop_image(image):
     bin_image = image[:, :, 1]
     umbral = threshold_otsu(bin_image)
-    bin_image=bin_image<umbral
+    bin_image=bin_image>umbral
     plt.figure()
     plt.imshow(bin_image,cmap="gray")
     plt.show()
+##
 cargas=charge_imgs()[0]
 print(len(cargas))
 ##
