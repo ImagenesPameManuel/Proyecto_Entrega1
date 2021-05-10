@@ -10,6 +10,7 @@ from scipy.io import loadmat
 #import requests
 from scipy.ndimage import minimum_filter
 from skimage.color import rgb2gray
+import skimage.transform as transfo
 import skimage.segmentation as segmenta
 import numpy as np
 import cv2
@@ -78,8 +79,8 @@ def charge_imgs():
 ##
 def crop_image(image):
     bin_image = image[:, :, 1]
-    umbral = 40#threshold_otsu(bin_image)
-    print(umbral)
+    umbral = threshold_otsu(bin_image) #TODO PREGUNTAR SOBRE UMBRAL ARBITARIO, PERCENTIL O...
+    #print(umbral)
     bin_image=bin_image>umbral
     ancho,largo=len(bin_image),len(bin_image[0])
     recortada=image.copy()
@@ -88,23 +89,33 @@ def crop_image(image):
     sobrantes_arriba, sobrantes_abajo = (len(mitad_arriba) - np.count_nonzero(np.count_nonzero(mitad_arriba, axis=1))), (len(mitad_abajo) - np.count_nonzero(np.count_nonzero(mitad_abajo, axis=1)))
     mitad_izq, mitad_der = bin_image[:, :largo // 2], bin_image[:, largo // 2:]
     sobrantes_izq, sobrantes_der = (len(mitad_izq[0]) - np.count_nonzero(np.count_nonzero(mitad_izq, axis=0))), (len(mitad_der[0]) - np.count_nonzero(np.count_nonzero(mitad_der, axis=0)))
-    recortada = recortada[sobrantes_arriba:-sobrantes_abajo, sobrantes_izq:-sobrantes_der]
+    if sobrantes_der!=0 and sobrantes_izq!=0 and sobrantes_arriba!=0 and sobrantes_abajo!=0:
+        recortada = recortada[sobrantes_arriba:-sobrantes_abajo, sobrantes_izq:-sobrantes_der]
+    elif sobrantes_der==0 and sobrantes_izq==0:
+        recortada = recortada[sobrantes_arriba:-sobrantes_abajo, :]
+    elif sobrantes_abajo == 0 and sobrantes_arriba == 0:
+        recortada = recortada[:, sobrantes_izq:-sobrantes_der]
     ancho_recorte,largo_recorte=len(recortada),len(recortada[0])
-    # cantidad_ancho=ancho-np.count_nonzero(sobrantes_ancho)
-    # cantidad_largo=(largo-(ancho-cantidad_ancho))//2
-    # recortada=recortada.crop((cantidad_largo, cantidad_ancho/2, cantidad_largo, cantidad_ancho/2))
+    # cantidad_ancho=ancho-np.count_nonzero(sobrantes_ancho)     # cantidad_largo=(largo-(ancho-cantidad_ancho))//2    # recortada=recortada.crop((cantidad_largo, cantidad_ancho/2, cantidad_largo, cantidad_ancho/2))
     if ancho_recorte<largo_recorte:
         dif=(largo_recorte-ancho_recorte)//2
         recortada=recortada[:,dif:-dif]
     elif largo_recorte<ancho_recorte:
         dif = (ancho_recorte - largo_recorte) // 2
         recortada = recortada[dif:-dif,:]
+    recortada=transfo.resize(recortada,(512,512))
     plt.figure()
     plt.imshow(bin_image,cmap="gray")
     plt.show()
     plt.figure()
     plt.imshow(recortada, cmap="gray")
     plt.show()
+    #TODO PREGUNTAR clasificación supervisada :
+    # teniendo en cuenta cómo se diagnostican las patologías que queremos (simplificación de clases a clasificar confirmar)
+    # cómo se incorporan las etiquetas?
+    # Un solo método o varios? Un descrip, varios? Cómo se haría?
+    # *en caso de necesitar entrenamiento como en lab problemas de error de memoria
+    #TODO excepciones del preprocesamiento que tenemos: imágenes demasiado recortadas y problemas con el umbral (pregunta de arriba)
 ##
 cargas=charge_imgs()[0]
 ##
@@ -112,10 +123,14 @@ cargas2=charge_imgs()[1]
 ##
 print(len(cargas))
 ##
+
+select_rand=np.random.randint(1,len(cargas)-1,6)
+print(select_rand)
+##
 cont=0
-for i in cargas2:
+for i in select_rand:
     #print(cargas)
-    crop_image(cargas2[i][0])
+    crop_image(cargas[i][0])
     cont+=1
     if cont>5:
         break
