@@ -78,11 +78,12 @@ def charge_imgs():
 ##
 def crop_image(image):
     bin_image = image[:, :, 1]
-    umbral = threshold_otsu(bin_image)
+    umbral = 40#threshold_otsu(bin_image)
+    print(umbral)
     bin_image=bin_image>umbral
     ancho,largo=len(bin_image),len(bin_image[0])
     recortada=image.copy()
-    recortada[:,:,0],recortada[:,:,1],recortada[:,:,2]=recortada[:,:,0]*bin_image,recortada[:,:,1]*bin_image,recortada[:,:,2]*bin_image
+    #recortada[:,:,0],recortada[:,:,1],recortada[:,:,2]=recortada[:,:,0]*bin_image,recortada[:,:,1]*bin_image,recortada[:,:,2]*bin_image
     mitad_arriba, mitad_abajo = bin_image[:ancho // 2, :], bin_image[ancho // 2:, :]
     sobrantes_arriba, sobrantes_abajo = (len(mitad_arriba) - np.count_nonzero(np.count_nonzero(mitad_arriba, axis=1))), (len(mitad_abajo) - np.count_nonzero(np.count_nonzero(mitad_abajo, axis=1)))
     mitad_izq, mitad_der = bin_image[:, :largo // 2], bin_image[:, largo // 2:]
@@ -106,12 +107,18 @@ def crop_image(image):
     plt.show()
 ##
 cargas=charge_imgs()[0]
+##
+cargas2=charge_imgs()[1]
+##
 print(len(cargas))
 ##
-for i in cargas:
+cont=0
+for i in cargas2:
     #print(cargas)
-    crop_image(cargas[i][0])
-    break
+    crop_image(cargas2[i][0])
+    cont+=1
+    if cont>5:
+        break
 ##
 
 
