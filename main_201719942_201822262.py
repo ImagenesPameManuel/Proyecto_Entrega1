@@ -24,7 +24,7 @@ import skimage.morphology as morfo
 import glob
 ##
 def charge_imgs():
-    imagenes = glob.glob(os.path.join("BasedeDatos", "Entrenamiento", "Entrena2", "*.jpg"))
+    imagenes = glob.glob(os.path.join("BasedeDatos", "Entrenamiento", "Entrena1", "*.jpg"))
     matriz_datos = []
     archivo = open(os.path.join("BasedeDatos", "full_df.csv"), mode="r")
     titulos = archivo.readline().split(",")
@@ -78,13 +78,15 @@ def charge_imgs():
 
 ##
 def crop_image(image):
-    bin_image = image[:, :, 1]
-    umbral = threshold_otsu(bin_image) #TODO PREGUNTAR SOBRE UMBRAL ARBITARIO, PERCENTIL O...
+    bin_image = image[:, :, 0]
+    #bin_image = rgb2gray(image)
+    #umbral = threshold_otsu(bin_image) #TODO PREGUNTAR SOBRE UMBRAL ARBITARIO, PERCENTIL O...
     #print(umbral)
+    umbral=6
     bin_image=bin_image>umbral
     ancho,largo=len(bin_image),len(bin_image[0])
     recortada=image.copy()
-    #recortada[:,:,0],recortada[:,:,1],recortada[:,:,2]=recortada[:,:,0]*bin_image,recortada[:,:,1]*bin_image,recortada[:,:,2]*bin_image
+    recortada[:,:,0],recortada[:,:,1],recortada[:,:,2]=recortada[:,:,0]*bin_image,recortada[:,:,1]*bin_image,recortada[:,:,2]*bin_image
     mitad_arriba, mitad_abajo = bin_image[:ancho // 2, :], bin_image[ancho // 2:, :]
     sobrantes_arriba, sobrantes_abajo = (len(mitad_arriba) - np.count_nonzero(np.count_nonzero(mitad_arriba, axis=1))), (len(mitad_abajo) - np.count_nonzero(np.count_nonzero(mitad_abajo, axis=1)))
     mitad_izq, mitad_der = bin_image[:, :largo // 2], bin_image[:, largo // 2:]
@@ -97,12 +99,12 @@ def crop_image(image):
         recortada = recortada[:, sobrantes_izq:-sobrantes_der]
     ancho_recorte,largo_recorte=len(recortada),len(recortada[0])
     # cantidad_ancho=ancho-np.count_nonzero(sobrantes_ancho)     # cantidad_largo=(largo-(ancho-cantidad_ancho))//2    # recortada=recortada.crop((cantidad_largo, cantidad_ancho/2, cantidad_largo, cantidad_ancho/2))
-    if ancho_recorte<largo_recorte:
+    """if ancho_recorte<largo_recorte:
         dif=(largo_recorte-ancho_recorte)//2
         recortada=recortada[:,dif:-dif]
     elif largo_recorte<ancho_recorte:
         dif = (ancho_recorte - largo_recorte) // 2
-        recortada = recortada[dif:-dif,:]
+        recortada = recortada[dif:-dif,:]"""
     recortada=transfo.resize(recortada,(512,512))
     plt.figure()
     plt.imshow(bin_image,cmap="gray")
