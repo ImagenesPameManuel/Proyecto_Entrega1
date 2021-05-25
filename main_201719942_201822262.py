@@ -105,12 +105,23 @@ def crop_image(image):
     elif largo_recorte<ancho_recorte:
         dif = (ancho_recorte - largo_recorte) // 2
         recortada = recortada[dif:-dif,:]"""
-    recortada=transfo.resize(recortada,(512,512))
-    plt.figure()
+
+    k_size=5
+    sigma=5
+    porcentaje_gris=256*0.5
+    filtradoGauss=cv2.GaussianBlur(recortada,(k_size,k_size),sigma)
+    resta_medioloc=(recortada-filtradoGauss)+porcentaje_gris
+    recortada = transfo.resize(recortada, (512, 512))
+    #preprocesada= transfo.resize(resta_medioloc, (512, 512))
+    """plt.figure()
     plt.imshow(bin_image,cmap="gray")
     plt.show()
-    plt.figure()
+    plt.figure()"""
     plt.imshow(recortada, cmap="gray")
+    plt.show()
+    plt.show()
+    plt.figure()
+    plt.imshow(resta_medioloc, cmap="gray")
     plt.show()
     #TODO PREGUNTAR clasificación supervisada :
     # teniendo en cuenta cómo se diagnostican las patologías que queremos (simplificación de clases a clasificar confirmar)
@@ -542,3 +553,4 @@ for i in selected2:
 prec=TP/(TP+FP)
 cob=TP/(TP+FN)
 print(prec,cob)
+##
