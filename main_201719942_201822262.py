@@ -8,13 +8,17 @@ from skimage.filters import threshold_otsu
 import nibabel
 from scipy.io import loadmat
 #import requests
+import pickle
 from scipy.ndimage import minimum_filter
 from skimage.color import rgb2gray
+import skimage.color as color
 import skimage.transform as transfo
 import skimage.segmentation as segmenta
+import sklearn.metrics as sk
 import numpy as np
 import cv2
 from  PIL import Image
+from sklearn import svm
 import matplotlib.pyplot as plt
 from skimage.filters import threshold_otsu
 import skimage.io as io
@@ -23,8 +27,9 @@ import os
 import skimage.morphology as morfo
 import glob
 ##
-def charge_imgs():
-    imagenes = glob.glob(os.path.join("BasedeDatos", "Entrenamiento", "Entrena1", "*.jpg"))
+
+def charge_imgs(imagen):
+    #imagenes = glob.glob(os.path.join("BasedeDatos", "Entrenamiento", "Entrena1", "*.jpg"))
     matriz_datos = []
     archivo = open(os.path.join("BasedeDatos", "full_df.csv"), mode="r")
     titulos = archivo.readline().split(",")
@@ -48,10 +53,23 @@ def charge_imgs():
         matriz_datos.append(linea)
         linea = archivo.readline()
     archivo.close()
-    selected1 = {}
-    selected2 = {}
-    cont = 1
-    for imagen in imagenes:
+    #selected1 = #{}
+    #selected2 = {}
+    #cont = 1
+
+    separador = imagen[len("BasedeDatos"):][0]
+    file_imagen = imagen.split(separador)[-1]
+    for i in range(1, len(matriz_datos)):
+        select_img = matriz_datos[i][-1]
+        if file_imagen == select_img:
+            # print(cont)
+            anotacion = matriz_datos[i][-3][0]
+            # print(anotacion)
+            carga = io.imread(imagen)
+            selected1 = (carga, anotacion)
+            # print(select_img)
+
+    """for imagen in imagenes:
         separador = imagen[len("BasedeDatos"):][0]
         file_imagen = imagen.split(separador)[-1]
         for i in range(1, len(matriz_datos)):
@@ -72,9 +90,9 @@ def charge_imgs():
                     carga = io.imread(imagen)
                     selected2[cont] = [carga, anotacion]
                     # print(select_img)
-                    cont += 1
+                    cont += 1"""
     #print(len(selected1))
-    return selected1,selected2
+    return selected1#,selected2
 
 ##
 def crop_image(image):
@@ -106,29 +124,92 @@ def crop_image(image):
         dif = (ancho_recorte - largo_recorte) // 2
         recortada = recortada[dif:-dif,:]"""
 
-    k_size=7
-    sigma=0
+    k_size=63
+    sigma=150
     porcentaje_gris=round(256*0.7)
     filtradoGauss=cv2.GaussianBlur(recortada,(k_size,k_size),sigma)
     resta_medioloc=(recortada-filtradoGauss)+porcentaje_gris
     recortada = transfo.resize(recortada, (512, 512))
     preprocesada= transfo.resize(resta_medioloc, (512, 512))
     """plt.figure()
+    plt.imshow(preprocesada, cmap="gray")
+    plt.show()"""
+    k_size = 7
+    sigma = 20
+    #preprocesada = cv2.GaussianBlur(preprocesada, (k_size, k_size), sigma)
+    #preprocesada=cv2.medianBlur(preprocesada, 5)
+    preprocesada = exposure.adjust_gamma(preprocesada, gamma=2)
+    #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, ksize=(7, 7))
+    #preprocesada= cv2.morphologyEx(preprocesada, cv2.MORPH_OPEN, kernel)
+    #preprocesada = exposure.adjust_gamma(preprocesada, gamma=2)
+    """plt.figure()
     plt.imshow(bin_image,cmap="gray")
     plt.show()"""
-    plt.figure()
+    """plt.figure()
+    plt.imshow(preprocesada, cmap="gray")
+    plt.show()"""
+    preprocesada=color.rgb2lab(preprocesada)
+    espacio_canal1 = preprocesada[:, :, 0]  # se extraen canales de la imagen en el espacio de color indicado por parámetro
+    espacio_canal2 = preprocesada[:, :, 1]
+    espacio_canal3 = preprocesada[:, :, 2]
+    frec_canal1 = np.histogram(espacio_canal1.flatten(), bins=np.arange(0, 256,   1))  # a cada canal se le realiza un .flantten para trabajan con su vector al cual se le van a sacar las frecuencias de valores entre 0 y 255 con np.histogram
+    frec_canal2 = np.histogram(espacio_canal2.flatten(), bins=np.arange(0, 256, 1))
+    frec_canal3 = np.histogram(espacio_canal3.flatten(), bins=np.arange(0, 256, 1))
+    hist_prev = np.concatenate([frec_canal1[0], frec_canal2[0], frec_canal3[0]],      axis=None)  # se concatenan los arreglos de las frecuencias de cada canal con .concatenate
+    hist = hist_prev / np.sum(hist_prev)
+
+    """plt.figure()
     plt.imshow(recortada, cmap="gray")
-    plt.show()
-    plt.show()
+    plt.show()"""
+    """plt.show()
     plt.figure()
     plt.imshow(preprocesada, cmap="gray")
-    plt.show()
+    plt.show()"""
+    return hist
     #TODO PREGUNTAR clasificación supervisada :
     # teniendo en cuenta cómo se diagnostican las patologías que queremos (simplificación de clases a clasificar confirmar)
     # cómo se incorporan las etiquetas?
     # Un solo método o varios? Un descrip, varios? Cómo se haría?
     # *en caso de necesitar entrenamiento como en lab problemas de error de memoria
     #TODO excepciones del preprocesamiento que tenemos: imágenes demasiado recortadas y problemas con el umbral (pregunta de arriba)
+##
+def matrix_descript():
+    m=charge_imgs()
+    descripts=np.array([])
+    for i in m:
+        np.append(descripts,m[i])
+
+
+##
+#cont=0
+descripts=[]
+anotaciones=[]
+imagenes = glob.glob(os.path.join("BasedeDatos", "Entrenamiento", "EvaluacionFIN", "*.jpg"))
+for imagen in imagenes:
+    descripts.append(crop_image(charge_imgs(imagen)[0]))
+    anotaciones.append(charge_imgs(imagen)[1])
+    """    if cont==3:
+        break"""
+    #cont+=1
+kernel_svm='linear'  #{‘linear’, ‘poly’, ‘rbf’, ‘sigmoid’, ‘precomputed’}
+entrenamiento_SVM = svm.SVC(kernel=kernel_svm).fit(descripts, anotaciones)
+pickle.dump(entrenamiento_SVM, open("SVM_COLORconcat_linear.npy", 'wb'))
+descripts_valida=[]
+anotaciones_valida=[]
+imagenes = glob.glob(os.path.join("BasedeDatos", "Validacion", "Proyecto_Validacion", "*.jpg"))
+for imagen in imagenes:
+    descripts_valida.append(crop_image(charge_imgs(imagen)[0]))
+    anotaciones_valida.append(charge_imgs(imagen)[1])
+modelo = pickle.load(open("SVM_COLORconcat_linear.npy", 'rb'))
+predicciones = modelo.predict(descripts_valida)
+conf_mat = sk.confusion_matrix(anotaciones_valida, predicciones)
+precision = sk.precision_score(anotaciones_valida, predicciones, average="macro", zero_division=1)
+recall = sk.recall_score(anotaciones_valida, predicciones, average="macro", zero_division=1)
+f_score = sk.f1_score(anotaciones_valida, predicciones, average="macro")
+print(conf_mat)
+print(precision)
+print(recall)
+print(f_score)
 ##
 cargas=charge_imgs()[0]
 ##
@@ -553,4 +634,3 @@ for i in selected2:
 prec=TP/(TP+FP)
 cob=TP/(TP+FN)
 print(prec,cob)
-##
