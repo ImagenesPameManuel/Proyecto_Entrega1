@@ -7,6 +7,9 @@
 from skimage.filters import threshold_otsu
 import nibabel
 from scipy.io import loadmat
+from functools import partial
+from sklearn import ensemble
+from skimage.feature import hog
 #import requests
 import pickle
 from scipy.ndimage import minimum_filter
@@ -102,7 +105,7 @@ def charge_imgs(imagen):
     return selected1#,selected2
 
 ##
-def crop_image(image):
+def crop_image(image,descript):
     bin_image = image[:, :, 0]
     #bin_image = rgb2gray(image)
     #umbral = threshold_otsu(bin_image) #TODO PREGUNTAR SOBRE UMBRAL ARBITARIO, PERCENTIL O...
@@ -155,15 +158,21 @@ def crop_image(image):
     """plt.figure()
     plt.imshow(preprocesada, cmap="gray")
     plt.show()"""
-    preprocesada=color.rgb2lab(preprocesada)
-    espacio_canal1 = preprocesada[:, :, 0]  # se extraen canales de la imagen en el espacio de color indicado por parámetro
-    espacio_canal2 = preprocesada[:, :, 1]
-    espacio_canal3 = preprocesada[:, :, 2]
-    frec_canal1 = np.histogram(espacio_canal1.flatten(), bins=np.arange(0, 256,   1))  # a cada canal se le realiza un .flantten para trabajan con su vector al cual se le van a sacar las frecuencias de valores entre 0 y 255 con np.histogram
-    frec_canal2 = np.histogram(espacio_canal2.flatten(), bins=np.arange(0, 256, 1))
-    frec_canal3 = np.histogram(espacio_canal3.flatten(), bins=np.arange(0, 256, 1))
-    hist_prev = np.concatenate([frec_canal1[0], frec_canal2[0], frec_canal3[0]],      axis=None)  # se concatenan los arreglos de las frecuencias de cada canal con .concatenate
-    hist = hist_prev / np.sum(hist_prev)
+
+    if descript=="COLOR":
+        preprocesada = color.rgb2lab(preprocesada)
+        espacio_canal1 = preprocesada[:, :, 0]  # se extraen canales de la imagen en el espacio de color indicado por parámetro
+        espacio_canal2 = preprocesada[:, :, 1]
+        espacio_canal3 = preprocesada[:, :, 2]
+        frec_canal1 = np.histogram(espacio_canal1.flatten(), bins=np.arange(0, 256,   1))  # a cada canal se le realiza un .flantten para trabajan con su vector al cual se le van a sacar las frecuencias de valores entre 0 y 255 con np.histogram
+        frec_canal2 = np.histogram(espacio_canal2.flatten(), bins=np.arange(0, 256, 1))
+        frec_canal3 = np.histogram(espacio_canal3.flatten(), bins=np.arange(0, 256, 1))
+        hist_prev = np.concatenate([frec_canal1[0], frec_canal2[0], frec_canal3[0]],      axis=None)  # se concatenan los arreglos de las frecuencias de cada canal con .concatenate
+        resp_descript = hist_prev / np.sum(hist_prev)
+    elif descript=="HOG":
+        pixels_per_cell2=50
+        norm_block="L2-Hys"
+        resp_descript = hog(preprocesada,block_norm=norm_block, pixels_per_cell=(pixels_per_cell2, pixels_per_cell2))
 
     """plt.figure()
     plt.imshow(recortada, cmap="gray")
@@ -172,7 +181,7 @@ def crop_image(image):
     plt.figure()
     plt.imshow(preprocesada, cmap="gray")
     plt.show()"""
-    return hist
+    return resp_descript
     #TODO PREGUNTAR clasificación supervisada :
     # teniendo en cuenta cómo se diagnostican las patologías que queremos (simplificación de clases a clasificar confirmar)
     # cómo se incorporan las etiquetas?
@@ -193,21 +202,21 @@ descripts=[]
 anotaciones=[]
 imagenes = glob.glob(os.path.join("BasedeDatos", "Entrenamiento", "EvaluacionFIN", "*.jpg"))
 for imagen in tqdm(imagenes):
-    descripts.append(crop_image(charge_imgs(imagen)[0]))
+    descripts.append(crop_image(charge_imgs(imagen)[0],descript="HOG"))
     anotaciones.append(charge_imgs(imagen)[1])
     """    if cont==3:
         break"""
     #cont+=1
 kernel_svm='linear'  #{‘linear’, ‘poly’, ‘rbf’, ‘sigmoid’, ‘precomputed’}
 entrenamiento_SVM = svm.SVC(kernel=kernel_svm).fit(descripts, anotaciones)
-pickle.dump(entrenamiento_SVM, open("SVM_COLORconcat_linear.npy", 'wb'))
+pickle.dump(entrenamiento_SVM, open("SVM_HOG_50pxls_L2Hys_linear.npy", 'wb'))
 print("calculó modelo")
-##
+
 descripts_valida=[]
 anotaciones_valida=[]
 imagenes = glob.glob(os.path.join("BasedeDatos", "Validacion", "Proyecto_Validacion", "*.jpg"))
 for imagen in tqdm(imagenes):
-    descripts_valida.append(crop_image(charge_imgs(imagen)[0]))
+    descripts_valida.append(crop_image(charge_imgs(imagen)[0],descript="HOG"))
     anotaciones_valida.append(charge_imgs(imagen)[1])
 modelo = pickle.load(open("SVM_COLORconcat_linear.npy", 'rb'))
 predicciones = modelo.predict(descripts_valida)
