@@ -12,6 +12,7 @@ import pickle
 from scipy.ndimage import minimum_filter
 from skimage.color import rgb2gray
 import skimage.color as color
+from tqdm import tqdm
 import skimage.transform as transfo
 import skimage.segmentation as segmenta
 import sklearn.metrics as sk
@@ -59,8 +60,10 @@ def charge_imgs(imagen):
 
     separador = imagen[len("BasedeDatos"):][0]
     file_imagen = imagen.split(separador)[-1]
+
     for i in range(1, len(matriz_datos)):
         select_img = matriz_datos[i][-1]
+
         if file_imagen == select_img:
             # print(cont)
             anotacion = matriz_datos[i][-3][0]
@@ -68,6 +71,10 @@ def charge_imgs(imagen):
             carga = io.imread(imagen)
             selected1 = (carga, anotacion)
             # print(select_img)
+            break
+
+    print(select_img)
+    print(file_imagen)
 
     """for imagen in imagenes:
         separador = imagen[len("BasedeDatos"):][0]
@@ -185,7 +192,7 @@ def matrix_descript():
 descripts=[]
 anotaciones=[]
 imagenes = glob.glob(os.path.join("BasedeDatos", "Entrenamiento", "EvaluacionFIN", "*.jpg"))
-for imagen in imagenes:
+for imagen in tqdm(imagenes):
     descripts.append(crop_image(charge_imgs(imagen)[0]))
     anotaciones.append(charge_imgs(imagen)[1])
     """    if cont==3:
@@ -194,6 +201,7 @@ for imagen in imagenes:
 kernel_svm='linear'  #{‘linear’, ‘poly’, ‘rbf’, ‘sigmoid’, ‘precomputed’}
 entrenamiento_SVM = svm.SVC(kernel=kernel_svm).fit(descripts, anotaciones)
 pickle.dump(entrenamiento_SVM, open("SVM_COLORconcat_linear.npy", 'wb'))
+print("calculó modelo")
 descripts_valida=[]
 anotaciones_valida=[]
 imagenes = glob.glob(os.path.join("BasedeDatos", "Validacion", "Proyecto_Validacion", "*.jpg"))
