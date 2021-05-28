@@ -202,10 +202,11 @@ kernel_svm='linear'  #{‘linear’, ‘poly’, ‘rbf’, ‘sigmoid’, ‘pr
 entrenamiento_SVM = svm.SVC(kernel=kernel_svm).fit(descripts, anotaciones)
 pickle.dump(entrenamiento_SVM, open("SVM_COLORconcat_linear.npy", 'wb'))
 print("calculó modelo")
+##
 descripts_valida=[]
 anotaciones_valida=[]
 imagenes = glob.glob(os.path.join("BasedeDatos", "Validacion", "Proyecto_Validacion", "*.jpg"))
-for imagen in imagenes:
+for imagen in tqdm(imagenes):
     descripts_valida.append(crop_image(charge_imgs(imagen)[0]))
     anotaciones_valida.append(charge_imgs(imagen)[1])
 modelo = pickle.load(open("SVM_COLORconcat_linear.npy", 'rb'))
