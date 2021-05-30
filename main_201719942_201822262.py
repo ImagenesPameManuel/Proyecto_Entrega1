@@ -163,14 +163,16 @@ def crop_image(image,descript):
     sigma = 20
     #preprocesada = cv2.GaussianBlur(preprocesada, (k_size, k_size), sigma)
     #preprocesada=cv2.medianBlur(preprocesada, 5)
-    preprocesada = exposure.adjust_gamma(preprocesada, gamma=2)
+
+    preprocesada = exposure.adjust_gamma(preprocesada, gamma=5)
+
     #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, ksize=(7, 7))
     #preprocesada= cv2.morphologyEx(preprocesada, cv2.MORPH_OPEN, kernel)
     #preprocesada = exposure.adjust_gamma(preprocesada, gamma=2)
     """plt.figure()
     plt.imshow(preprocesada, cmap="gray")
     plt.show()"""
-    preprocesada=image
+
     """plt.figure()
     plt.imshow(preprocesada, cmap="gray")
     plt.show()"""
@@ -229,7 +231,7 @@ for imagen in tqdm(imagenes):
 
 kernel_svm='linear'  #{‘linear’, ‘poly’, ‘rbf’, ‘sigmoid’, ‘precomputed’}
 entrenamiento_SVM = svm.SVC(kernel=kernel_svm).fit(descripts, anotaciones)
-pickle.dump(entrenamiento_SVM, open("SVM_HOG_30pxls_L2Hys_linear_sinprec.npy", 'wb'))
+pickle.dump(entrenamiento_SVM, open("SVM_HOG_30pxls_L2Hys_linear_gamma5.npy", 'wb'))
 print("calculó modelo")
 
 descripts_valida=[]
@@ -239,7 +241,7 @@ for imagen in tqdm(imagenes):
     descripts_valida.append(crop_image(charge_imgs(imagen)[0],descript="HOG"))
     anotaciones_valida.append(charge_imgs(imagen)[1])
 
-modelo = pickle.load(open("SVM_HOG_30pxls_L2Hys_linear_sinprec.npy", 'rb'))
+modelo = pickle.load(open("SVM_HOG_30pxls_L2Hys_linear_gamma5.npy", 'rb'))
 predicciones = modelo.predict(descripts_valida)
 conf_mat = sk.confusion_matrix(anotaciones_valida, predicciones)
 precision = sk.precision_score(anotaciones_valida, predicciones, average="macro", zero_division=1)
