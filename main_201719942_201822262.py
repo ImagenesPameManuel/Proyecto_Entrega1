@@ -170,7 +170,7 @@ def crop_image(image,descript):
     """plt.figure()
     plt.imshow(preprocesada, cmap="gray")
     plt.show()"""
-    #preprocesada=image
+    preprocesada=image
     """plt.figure()
     plt.imshow(preprocesada, cmap="gray")
     plt.show()"""
@@ -221,25 +221,25 @@ descripts=[]
 anotaciones=[]
 imagenes = glob.glob(os.path.join("BasedeDatos", "Entrenamiento", "EvaluacionFIN", "*.jpg"))
 for imagen in tqdm(imagenes):
-    descripts.append(crop_image(charge_imgs(imagen)[0],descript="COLOR"))
+    descripts.append(crop_image(charge_imgs(imagen)[0],descript="HOG"))
     anotaciones.append(charge_imgs(imagen)[1])
     """if cont==3:
         break
     cont+=1"""
-##
+
 kernel_svm='linear'  #{‘linear’, ‘poly’, ‘rbf’, ‘sigmoid’, ‘precomputed’}
 entrenamiento_SVM = svm.SVC(kernel=kernel_svm).fit(descripts, anotaciones)
-pickle.dump(entrenamiento_SVM, open("SVM_HOG_30pxls_L2Hys_linear.npy", 'wb'))
+pickle.dump(entrenamiento_SVM, open("SVM_HOG_30pxls_L2Hys_linear_sinprec.npy", 'wb'))
 print("calculó modelo")
-##
+
 descripts_valida=[]
 anotaciones_valida=[]
 imagenes = glob.glob(os.path.join("BasedeDatos", "Validacion", "Proyecto_Validacion", "*.jpg"))
 for imagen in tqdm(imagenes):
     descripts_valida.append(crop_image(charge_imgs(imagen)[0],descript="HOG"))
     anotaciones_valida.append(charge_imgs(imagen)[1])
-##
-modelo = pickle.load(open("SVM_HOG_30pxls_L2Hys_linear.npy", 'rb'))
+
+modelo = pickle.load(open("SVM_HOG_30pxls_L2Hys_linear_sinprec.npy", 'rb'))
 predicciones = modelo.predict(descripts_valida)
 conf_mat = sk.confusion_matrix(anotaciones_valida, predicciones)
 precision = sk.precision_score(anotaciones_valida, predicciones, average="macro", zero_division=1)
