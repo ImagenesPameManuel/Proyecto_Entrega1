@@ -73,11 +73,15 @@ def charge_imgs(imagen):
             # print(anotacion)
             carga = io.imread(imagen)
             selected1 = (carga, anotacion)
+            if anotacion!="N" and anotacion!="C" and anotacion!="D" and anotacion!="G":
+                print(anotacion)
+                print(select_img)
+                print(file_imagen)
             # print(select_img)
             break
 
-    print(select_img)
-    print(file_imagen)
+    """print(select_img)
+    print(file_imagen)"""
 
     """for imagen in imagenes:
         separador = imagen[len("BasedeDatos"):][0]
@@ -106,12 +110,18 @@ def charge_imgs(imagen):
 
 ##
 def crop_image(image,descript):
+    """plt.figure() #original
+    plt.imshow(image, cmap="gray")
+    plt.show()"""
     bin_image = image[:, :, 0]
     #bin_image = rgb2gray(image)
     #umbral = threshold_otsu(bin_image) #TODO PREGUNTAR SOBRE UMBRAL ARBITARIO, PERCENTIL O...
     #print(umbral)
     umbral=6
     bin_image=bin_image>umbral
+    """plt.figure()
+    plt.imshow(bin_image,cmap="gray") #círculo bin
+    plt.show()"""
     ancho,largo=len(bin_image),len(bin_image[0])
     recortada=image.copy()
     recortada[:,:,0],recortada[:,:,1],recortada[:,:,2]=recortada[:,:,0]*bin_image,recortada[:,:,1]*bin_image,recortada[:,:,2]*bin_image
@@ -133,13 +143,18 @@ def crop_image(image,descript):
     elif largo_recorte<ancho_recorte:
         dif = (ancho_recorte - largo_recorte) // 2
         recortada = recortada[dif:-dif,:]"""
-
+    """plt.figure()
+    plt.imshow(recortada, cmap="gray")
+    plt.show()"""
     k_size=63
     sigma=150
     porcentaje_gris=round(256*0.7)
     filtradoGauss=cv2.GaussianBlur(recortada,(k_size,k_size),sigma)
     resta_medioloc=(recortada-filtradoGauss)+porcentaje_gris
     recortada = transfo.resize(recortada, (512, 512))
+    """plt.figure()
+    plt.imshow(resta_medioloc, cmap="gray")
+    plt.show()"""
     preprocesada= transfo.resize(resta_medioloc, (512, 512))
     """plt.figure()
     plt.imshow(preprocesada, cmap="gray")
@@ -153,14 +168,18 @@ def crop_image(image,descript):
     #preprocesada= cv2.morphologyEx(preprocesada, cv2.MORPH_OPEN, kernel)
     #preprocesada = exposure.adjust_gamma(preprocesada, gamma=2)
     """plt.figure()
-    plt.imshow(bin_image,cmap="gray")
+    plt.imshow(preprocesada, cmap="gray")
     plt.show()"""
+    #preprocesada=image
     """plt.figure()
     plt.imshow(preprocesada, cmap="gray")
     plt.show()"""
 
     if descript=="COLOR":
         preprocesada = color.rgb2lab(preprocesada)
+        """plt.figure()
+        plt.imshow(preprocesada, cmap="gray")
+        plt.show()"""
         espacio_canal1 = preprocesada[:, :, 0]  # se extraen canales de la imagen en el espacio de color indicado por parámetro
         espacio_canal2 = preprocesada[:, :, 1]
         espacio_canal3 = preprocesada[:, :, 2]
@@ -170,8 +189,8 @@ def crop_image(image,descript):
         hist_prev = np.concatenate([frec_canal1[0], frec_canal2[0], frec_canal3[0]],      axis=None)  # se concatenan los arreglos de las frecuencias de cada canal con .concatenate
         resp_descript = hist_prev / np.sum(hist_prev)
     elif descript=="HOG":
-        pixels_per_cell2=50
-        norm_block="L2-Hys"
+        pixels_per_cell2=30
+        norm_block="L2-Hys" #{‘L1’, ‘L1-sqrt’, ‘L2’, ‘L2-Hys’}
         resp_descript = hog(preprocesada,block_norm=norm_block, pixels_per_cell=(pixels_per_cell2, pixels_per_cell2))
 
     """plt.figure()
@@ -202,23 +221,25 @@ descripts=[]
 anotaciones=[]
 imagenes = glob.glob(os.path.join("BasedeDatos", "Entrenamiento", "EvaluacionFIN", "*.jpg"))
 for imagen in tqdm(imagenes):
-    descripts.append(crop_image(charge_imgs(imagen)[0],descript="HOG"))
+    descripts.append(crop_image(charge_imgs(imagen)[0],descript="COLOR"))
     anotaciones.append(charge_imgs(imagen)[1])
-    """    if cont==3:
-        break"""
-    #cont+=1
+    """if cont==3:
+        break
+    cont+=1"""
+##
 kernel_svm='linear'  #{‘linear’, ‘poly’, ‘rbf’, ‘sigmoid’, ‘precomputed’}
 entrenamiento_SVM = svm.SVC(kernel=kernel_svm).fit(descripts, anotaciones)
-pickle.dump(entrenamiento_SVM, open("SVM_HOG_50pxls_L2Hys_linear.npy", 'wb'))
+pickle.dump(entrenamiento_SVM, open("SVM_HOG_30pxls_L2Hys_linear.npy", 'wb'))
 print("calculó modelo")
-
+##
 descripts_valida=[]
 anotaciones_valida=[]
 imagenes = glob.glob(os.path.join("BasedeDatos", "Validacion", "Proyecto_Validacion", "*.jpg"))
 for imagen in tqdm(imagenes):
     descripts_valida.append(crop_image(charge_imgs(imagen)[0],descript="HOG"))
     anotaciones_valida.append(charge_imgs(imagen)[1])
-modelo = pickle.load(open("SVM_COLORconcat_linear.npy", 'rb'))
+##
+modelo = pickle.load(open("SVM_HOG_30pxls_L2Hys_linear.npy", 'rb'))
 predicciones = modelo.predict(descripts_valida)
 conf_mat = sk.confusion_matrix(anotaciones_valida, predicciones)
 precision = sk.precision_score(anotaciones_valida, predicciones, average="macro", zero_division=1)
