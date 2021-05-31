@@ -124,10 +124,10 @@ def crop_image(image,descript):
     plt.show()'''
     ancho,largo=len(bin_image),len(bin_image[0])
     recortada=image.copy()
-    print(recortada.shape)
+    #print(recortada.shape)
     recortada[:,:,0],recortada[:,:,1],recortada[:,:,2]=recortada[:,:,0]*bin_image,recortada[:,:,1]*bin_image,recortada[:,:,2]*bin_image
-    print(recortada)
-    print(recortada.shape)
+    #print(recortada)
+    #print(recortada.shape)
     '''plt.figure()
     plt.imshow(recortada, cmap="gray")
     plt.show()'''
@@ -135,14 +135,15 @@ def crop_image(image,descript):
     sobrantes_arriba, sobrantes_abajo = (len(mitad_arriba) - np.count_nonzero(np.count_nonzero(mitad_arriba, axis=1))), (len(mitad_abajo) - np.count_nonzero(np.count_nonzero(mitad_abajo, axis=1)))
     mitad_izq, mitad_der = bin_image[:, :largo // 2], bin_image[:, largo // 2:]
     sobrantes_izq, sobrantes_der = (len(mitad_izq[0]) - np.count_nonzero(np.count_nonzero(mitad_izq, axis=0))), (len(mitad_der[0]) - np.count_nonzero(np.count_nonzero(mitad_der, axis=0)))
-    if sobrantes_der == 0 and sobrantes_izq == 0 and sobrantes_arriba == 0 and sobrantes_abajo == 0:
-        recortada = recortada
-    elif sobrantes_der!=0 and sobrantes_izq!=0 and sobrantes_arriba!=0 and sobrantes_abajo!=0:
-        recortada = recortada[sobrantes_arriba:-sobrantes_abajo, sobrantes_izq:-sobrantes_der]
-    elif sobrantes_der==0 and sobrantes_izq==0:
-        recortada = recortada[sobrantes_arriba:-sobrantes_abajo, :]
-    elif sobrantes_abajo == 0 and sobrantes_arriba == 0:
-        recortada = recortada[:, sobrantes_izq:-sobrantes_der]
+    if sobrantes_der != 0: #and sobrantes_izq == 0 and sobrantes_arriba == 0 and sobrantes_abajo == 0:
+        recortada = recortada[:, :-sobrantes_der]
+    if sobrantes_izq != 0:
+        recortada = recortada[:, sobrantes_izq:]
+            #recortada[sobrantes_arriba:-sobrantes_abajo, sobrantes_izq:-sobrantes_der]
+    if sobrantes_abajo != 0: #(sobrantes_der==0 and sobrantes_izq==0): #or sobrantes_der == sobrantes_izq:
+        recortada = recortada[:-sobrantes_abajo, :]
+    if sobrantes_arriba != 0: #or sobrantes_abajo == sobrantes_arriba:
+        recortada = recortada[sobrantes_arriba:, :]
     #ancho_recorte,largo_recorte=len(recortada),len(recortada[0])
     # cantidad_ancho=ancho-np.count_nonzero(sobrantes_ancho)     # cantidad_largo=(largo-(ancho-cantidad_ancho))//2    # recortada=recortada.crop((cantidad_largo, cantidad_ancho/2, cantidad_largo, cantidad_ancho/2))
     """if ancho_recorte<largo_recorte:
@@ -151,9 +152,9 @@ def crop_image(image,descript):
     elif largo_recorte<ancho_recorte:
         dif = (ancho_recorte - largo_recorte) // 2
         recortada = recortada[dif:-dif,:]"""
-    plt.figure()
+    ''' plt.figure()
     plt.imshow(recortada, cmap="gray")
-    plt.show()
+    plt.show()'''
     #k_size=63
     #sigma=150
     #porcentaje_gris=round(256*0.7)
@@ -181,9 +182,9 @@ def crop_image(image,descript):
     plt.imshow(preprocesada, cmap="gray")
     plt.show()"""
 
-    """plt.figure()
+    '''plt.figure()
     plt.imshow(preprocesada, cmap="gray")
-    plt.show()"""
+    plt.show()'''
 
     if descript=="COLOR":
         preprocesada = color.rgb2lab(preprocesada)
@@ -249,6 +250,7 @@ imagenes = glob.glob(os.path.join("BasedeDatos", "Validacion", "ValidacionFINAL"
 for imagen in tqdm(imagenes):
     descripts_valida.append(crop_image(charge_imgs(imagen)[0], descript="HOG"))
     anotaciones_valida.append(charge_imgs(imagen)[1])
+
 
 modelo = pickle.load(open("SVM_HOG_30pxls_L2Hys_linear_apertura_sinprec.npy", 'rb'))
 predicciones = modelo.predict(descripts_valida)
@@ -684,3 +686,6 @@ for i in selected2:
 prec=TP/(TP+FP)
 cob=TP/(TP+FN)
 print(prec,cob)
+##
+a = [[1,2], [3,4]]
+print(a[:][1:-1])
