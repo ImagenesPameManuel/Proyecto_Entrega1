@@ -1,0 +1,576 @@
+#Análisis y procesamiento de imágenes: Proyecto Final Clasificación de fondos oculares para el diagnóstico de enfermedades
+#Pamela Ramírez González            #Código: 201822262
+#Manuel Gallegos Bustamante         #Código: 201719942
+#Sabina Nieto Ramón                 #Código: 201820051
+#Nicolás Mora Carrizosa             #Código: 201821509
+
+##Se importan librerías que se utilizarán para el desarrollo del proyecto
+from sklearn import ensemble
+import argparse
+from skimage.feature import hog
+import pickle
+import skimage.color as color
+from tqdm import tqdm
+import time
+import skimage.transform as transfo
+import sklearn.metrics as sk
+import cv2
+from sklearn import svm
+import skimage.io as io
+import os
+import glob
+import numpy as np
+from skimage import img_as_float
+
+def charge_imgs(imagen):
+    """
+    Función para carga de una imaagen con su respectiva anotación
+    :param imagen: ruta de la imagen a cargar
+    :return: tupla con la carga de la imagen y su anotación en ese orden respectivamente
+    """
+    matriz_datos = [] #matriz para almacenar datos del archivo cada fila correspondiendo a cada una de las imágenes anotadas
+    archivo = open(os.path.join(".","Datos", "Anotaciones","full_df.csv"), mode="r") #lectura del archivo que contiene anotaciones
+    titulos = archivo.readline().split(",")
+    matriz_datos.append(titulos)
+    linea = archivo.readline()
+    while len(linea) > 0: #recorrido para lectura de cada una de las imágenes
+        linea = linea[1:-2].split(",") # serie de extracciones para obtener los datos en una lista
+        linea[1] = int(linea[1])
+        linea[-9] = linea[-9][-1:]
+        linea[-2] = linea[-2][:2]
+        lisa = ""
+        for i in range(-9, -1):
+            lisa += linea[i]
+        lisa = lisa.replace(" ", "")
+        del linea[-9:-1]
+        unir = np.array([list(lisa)])
+        linea[-1:-1] = unir
+        linea[-3] = list(linea[-3][2:-2])
+        matriz_datos.append(linea)
+        linea = archivo.readline() # se procede a evaluar la siguiente línea del archivo
+    archivo.close() #se cierra el archivo
+    separador = imagen[len(os.path.join(".","Datos")):][0] #separador de rutas dependiente del computador sobre el cual se trabaje
+    file_imagen = imagen.split(separador)[-1] #se saca el nombre del archivo de la imagen que entra por parámetro dentro de la ruta
+    for i in range(1, len(matriz_datos)): #recorrido para carga y obtención de la anotación de la imagen de interés que entra por la ruta de parámetro
+        select_img = matriz_datos[i][-1] #se evalua la imagen en la matriz llenada previamente con la información del archivo con anotaciones
+        if file_imagen == select_img: # se corrobora que el archivo de interés corresponde al de la fila en la matriz con anotaciones
+            anotacion = matriz_datos[i][-3][0] #se extrae la anotación
+            carga = io.imread(imagen) #se carga la imagen
+            selected1 = (carga, anotacion) #tupla con información de interés de carga y anotación
+            break
+    return selected1
+
+def crop_image(image):
+    """
+    Se realiza el preprocesamiento de la imagen y el cálculo de su descriptor
+    :param image: matriz de la imagen a preprocesar
+    :return: descriptor de la imagen
+    """
+    bin_image = image[:, :, 0] # se extrae el canal r de la imagen
+    umbral=6 # umbral arbitrario para el cálculo de la máscara binaria
+    bin_image=bin_image>umbral # binarización del canal r con el umbral arbitrario
+    ancho,largo=len(bin_image),len(bin_image[0]) # dimensiones de la máscara binaria
+    recortada=image.copy() # copia de la imagen para recortarla
+    recortada[:,:,0],recortada[:,:,1],recortada[:,:,2]=recortada[:,:,0]*bin_image,recortada[:,:,1]*bin_image,recortada[:,:,2]*bin_image # se obtiene el ojo con el fondo negro al multiplicar cada canal por la máscara binaria
+    mitad_arriba, mitad_abajo = bin_image[:ancho // 2, :], bin_image[ancho // 2:, :] # variables para hallar la cantidad de ceros a cada uno de los extremos
+    sobrantes_arriba, sobrantes_abajo = (len(mitad_arriba) - np.count_nonzero(np.count_nonzero(mitad_arriba, axis=1))), (len(mitad_abajo) - np.count_nonzero(np.count_nonzero(mitad_abajo, axis=1)))
+    mitad_izq, mitad_der = bin_image[:, :largo // 2], bin_image[:, largo // 2:]
+    sobrantes_izq, sobrantes_der = (len(mitad_izq[0]) - np.count_nonzero(np.count_nonzero(mitad_izq, axis=0))), (len(mitad_der[0]) - np.count_nonzero(np.count_nonzero(mitad_der, axis=0)))
+    if sobrantes_der != 0: #condicionales para recorte de la imagen de manera de que se enfoque el ojo
+        recortada = recortada[:, :-sobrantes_der]
+    if sobrantes_izq != 0:
+        recortada = recortada[:, sobrantes_izq:]
+    if sobrantes_abajo != 0:
+        recortada = recortada[:-sobrantes_abajo, :]
+    if sobrantes_arriba != 0:
+        recortada = recortada[sobrantes_arriba:, :]
+
+    #PREPROCESAMIENTO HOG
+    # 1. tomar la imagen recortada previamente y sacar el 50% del nivel de gris
+    #       1.1 Aplicar un filtro Gaussiano con kernel 63x63 y sigma=150
+    #       1.2 Restar el filtrado Gaussiano a la imagen original y sumarle el 50% de la intensidad
+    # 2. realizar un resize de las imágenes de manera de que queden de 512x512
+    # 3. Realizar una apertura de la imagen con un kernel de elipse de 7x7
+    k_size = 63
+    sigma = 150
+    porcentaje_gris = round(256 * 0.5)
+    filtradoGauss = cv2.GaussianBlur(recortada, (k_size, k_size), sigma)
+    resta_medioloc = (recortada - filtradoGauss) + porcentaje_gris
+
+    preprocesada = transfo.resize(resta_medioloc, (512, 512))
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, ksize=(7, 7))
+    preprocesada = cv2.morphologyEx(preprocesada, cv2.MORPH_OPEN, kernel)
+
+    #MODELO HOG
+    # Hallar el descriptor de HOG con 30 pixels per cell y una distancia para realizar el histograma de L2-Hys
+    pixels_per_cell2=30
+    norm_block="L2-Hys"
+    resp_descript = hog(preprocesada,block_norm=norm_block, pixels_per_cell=(pixels_per_cell2, pixels_per_cell2))
+
+    return resp_descript
+
+def test_predict(descript):
+    """
+    se hallan predicciones del modelo
+    :param descript: descriptores de las imágenes para realizar predicciones
+    :return: predicciones del modelo
+    """
+    modelo = pickle.load(open(os.path.join(".","modelos", "SVM_HOG_30pxls_L2Hys_linear_apertura50.npy"), 'rb'))
+    prediction = modelo.predict(descript)
+    return  prediction
+
+def show_metrics():
+    """
+    Se preprocesan las imágenes de prueba, se hallan sus respectivos descriptores y predicciones haciendo uso de funciones definidas previamente
+    Se muestra al usuario resultados del método de clasificación realizado
+    """
+    inicio = time.time() # se inicia el tiempo del algoritmo
+    descripts_test = [] #variables para almacenar descriptores y anotaciones
+    anotaciones_test = []
+    imagenes = glob.glob(os.path.join(".", "Datos", "Imágenes", "PruebaFINAL", "*.jpg"))   # obtención de rutas de las imágenes de prueba
+    nombredescripts_test = "descripts_test_modelofinal.npy"
+
+    for imagen in tqdm(imagenes): # se calculan los descriptores y anotaciones para cada una de las imágenes haciendo uso de las funciones definidas previamente
+        descripts_test.append(crop_image(charge_imgs(imagen)[0]))
+        anotaciones_test.append(charge_imgs(imagen)[1])
+
+    predicciones = test_predict(descripts_test) # se calculan las predicciones de las imágenes
+
+    conf_mat = sk.confusion_matrix(anotaciones_test, predicciones) # cálculo de métricas del modelo
+    precision = sk.precision_score(anotaciones_test, predicciones, average="macro", zero_division=1)
+    recall = sk.recall_score(anotaciones_test, predicciones, average="macro", zero_division=1)
+    f_score = sk.f1_score(anotaciones_test, predicciones, average="macro")
+
+    fin = time.time() # se finaliza el tiempo que tarda el algoritmo
+    demora = fin - inicio
+    #  SE MUESTRAN LOS RESULTADOS AL USUARIO
+    print("\n---------RESULTADOS---------")
+    print(f"\nEl preprocesamiento y clasificación del conjunto de prueba se tardó {demora} sec\n\n"
+          f"Métricas generales del modelo:\n"
+          f"Precisión: {precision:10} | Cobertura: {recall:10} | F-score: {f_score:10}\n"
+          f"Matriz de confusión:\n"
+          f"{conf_mat}\n\n"
+          f"Reporte de clasificación:\n"
+          f"{sk.classification_report(anotaciones_test, predicciones)}")
+
+parser = argparse.ArgumentParser(description='Clasificación de fondos oculares para el diagnóstico de enfermedades') # se inicializa Parser
+parser.add_argument('-i', '--imagen', type=str, default=None, help='Nombre de la imagen a evaluar\nEj: 553_left.jpg')
+args = parser.parse_args()
+
+if __name__ == '__main__':
+    if args.imagen is None: # si no se desea evaluar una imagen en específico se calcula el modelo para todas las imágenes de prueba haciendo uso de la función creada para este fin
+        show_metrics()
+    else: # si se ingresa la imagen por parámetros
+
+        inicio=time.time() # se inicia el tiempo del algoritmo
+
+        descripts_test = [] #variables para almacenar descriptor y anotación
+        anotaciones_test = []
+        imagenes = glob.glob(
+            os.path.join(".","Datos", "Imágenes", "PruebaFINAL", args.imagen))   # obtención de ruta de la imagen de prueba ingresada por parám
+        nombredescripts_test = "descripts_test_modelofinal.npy"
+
+        for imagen in tqdm(imagenes): # se calcula el descriptor y se obtiene la anotación de la imagen ingresada por paáretro haciendo uso de las funciones definidas previamente
+            descripts_test.append(crop_image(charge_imgs(imagen)[0]))
+            anotaciones_test.append(charge_imgs(imagen)[1])
+
+        predicciones = test_predict(descripts_test) # se predice el modelo haciendo uso de la función creada para esto
+
+        fin=time.time()# se finaliza el tiempo que tarda el algoritmo
+        demora=fin-inicio
+        #  SE MUESTRAN LOS RESULTADOS AL USUARIO
+        print(f"\n---------RESULTADOS para la imagen: {args.imagen}---------")
+        print(f"\nPertenece a la clase: {anotaciones_test}\n"
+              f"Fue asignada a la clase: {predicciones}\n"
+              f"Métrica de clasificación: {int(predicciones==anotaciones_test)}\n\n"
+              f"El preprocesamiento y clasificación de la imagen se tardó {demora} sec")
+
+
+
+
+##Análisis y procesamiento de imágenes: Proyecto Final Clasificación de fondos oculares para el diagnóstico de enfermedades
+#código experimentos
+#Pamela Ramírez González            #Código: 201822262
+#Manuel Gallegos Bustamante         #Código: 201719942
+#Sabina Nieto Ramón                 #Código: 201820051
+#Nicolás Mora Carrizosa             #Código: 201821509
+#Se importan librerías que se utilizarán para el desarrollo del proyecto
+
+from sklearn.neural_network import MLPClassifier
+from skimage import img_as_float
+from skimage.feature import hog
+from sklearn import ensemble
+from sklearn import svm
+from tqdm import tqdm
+
+import skimage.transform as transfo
+import matplotlib.pyplot as plt
+import skimage.color as color
+import sklearn.metrics as sk
+import skimage.io as io
+import numpy as np
+import pickle
+import glob
+import cv2
+import os
+
+def JointColorHistogram(img, num_bins, min_val=None, max_val=None): #código tomado de los archivos proporcionados para el miniproyecto 4 para calcular descriptores de color con histogramas conjuntos
+    """
+    Calculate joint histogram for color images
+    By: Maria Fernanda Roa
+
+    Arguments: img (numpy.array) -- 2D color image
+    num_bins (array like of ints) -- Number of bins per channel.
+    If an int is given, all channels will have same amount of bins.
+
+    Keyword Arguments:
+    min_val (array like of ints) -- Minimum intensity range value per channel
+    If an int is given, all channels will have same minimum. (default: {None})
+    max_val (array like of ints) -- Maximum intensity range value per channel
+    If an int is given, all channels will have same maximum. (default: {None})
+
+    Returns: [numpy.array] -- Array containing joint color histogram of size num_bins.
+    """
+
+    assert len(img.shape) == 3, 'img must be a color 2D image'
+
+    # Transform image to float dtype
+    img = img_as_float(img)
+    _, _, n_channels = img.shape
+
+    # Verify input parameters
+    assert isinstance(num_bins, (int, tuple, list, np.array)), 'num_bins must be int or array like'
+
+    if isinstance(num_bins, int):
+        num_bins = np.array([num_bins] * n_channels)
+    else:
+        num_bins = np.array(num_bins)
+
+    assert len(num_bins) == n_channels, 'num_bins length and number of channels differ'
+
+    if min_val is None:
+        min_val = np.min(img, (0, 1))
+    else:
+        assert isinstance(min_val, (int, tuple, list, np.array)), 'min_val must be int or array like'
+        if isinstance(min_val, int):
+            min_val = np.array([min_val] * n_channels)
+        else:
+            min_val = np.array(min_val)
+
+    assert len(min_val) == n_channels, 'min_val length and number of channels differ'
+
+    min_val = min_val.reshape((1, 1, -1))
+
+    if max_val is None:
+        max_val = np.max(img, (0, 1))
+    else:
+        assert isinstance(max_val, (int, tuple, list, np.array)), 'max_val must be int or array like'
+        if isinstance(max_val, int):
+            max_val = np.array([max_val] * n_channels)
+        else:
+            max_val = np.array(max_val)
+
+    assert len(max_val) == n_channels, 'max_val length and number of channels differ'
+    max_val = max_val.reshape((1, 1, -1)) + 1e-5
+
+    joint_hist = np.zeros(num_bins, dtype=np.int)
+    num_bins = num_bins.reshape((1, 1, -1))
+
+    # Scale intensities (intensities are scaled within the range for each channel)
+    # Values now are between 0 and 1
+    img = (img - min_val) / (max_val - min_val)
+
+    # Calculate index matrix
+    idx_matrix = np.floor(img * num_bins).astype('int')
+    idx_matrix = idx_matrix.reshape((-1, n_channels))
+
+    # Create joint histogram
+    for p in range(len(idx_matrix)):
+        joint_hist[tuple(idx_matrix[p, :])] += 1
+
+    return joint_hist / np.sum(joint_hist)
+
+def charge_imgs(imagen):
+    '''
+    Función que carga una imagen ingresada por parámetro.
+    :param imagen: El nombre de la imagen a cargar
+    :return: Una tupla con la imagen cargada y su respectiva anotación
+    '''
+    # Se abren y leen las anotaciones
+    matriz_datos = []  # matriz para almacenar datos del archivo cada fila correspondiendo a cada una de las imágenes anotadas
+    archivo = open(os.path.join("BasedeDatos", "full_df.csv"), mode="r")#lectura del archivo que contiene anotaciones
+    titulos = archivo.readline().split(",")
+    matriz_datos.append(titulos)
+    linea = archivo.readline()
+    # Se reealizan operaciones de formato
+    while len(linea) > 0: #recorrido para lectura de cada una de las imágenes
+        linea = linea[1:-2].split(",") # serie de extracciones para obtener los datos en una lista
+        linea[1] = int(linea[1])
+        linea[-9] = linea[-9][-1:]
+        linea[-2] = linea[-2][:2]
+        lisa = ""
+        for i in range(-9, -1):
+            lisa += linea[i]
+        lisa = lisa.replace(" ", "")
+        del linea[-9:-1]
+        unir = np.array([list(lisa)])
+        linea[-1:-1] = unir
+        linea[-3] = list(linea[-3][2:-2])
+        matriz_datos.append(linea)
+        linea = archivo.readline()
+    archivo.close()
+    separador = imagen[len("BasedeDatos"):][0]
+    file_imagen = imagen.split(separador)[-1]
+    for i in range(1, len(matriz_datos)):
+        select_img = matriz_datos[i][-1]
+        if file_imagen == select_img:
+            anotacion = matriz_datos[i][-3][0]
+            carga = io.imread(imagen)
+            # Variable a retornar
+            selected1 = (carga, anotacion)
+            if anotacion!="N" and anotacion!="C" and anotacion!="M" and anotacion!="G":
+                print(anotacion)
+                print(select_img)
+                print(file_imagen)
+            break
+    return selected1
+
+def crop_image(image,descript,espacio=False,histcolor=False):
+    '''
+    Esta función permite cortar una imagen ingresada por parámetro para dejar
+    todas las imágenes del proyecto en un mismo formato
+    :param image: la imagen para cortar
+    :param descript: El tipo de descriptor utilizado (COLOR, HOG)
+    :param espacio: El espacio de color utilizado (Luv, Lab, HSV)
+    :param histcolor: El histograma de color utilizado (Joint, concat)
+    :return: el descriptor para la imagen ingresada por parámetro
+    '''
+
+    """plt.figure() #original
+    plt.imshow(image, cmap="gray")
+    plt.show()"""
+    plt.figure()  # original
+    plt.imshow(image, cmap="gray")
+    plt.show()
+    bin_image = image[:, :, 0]# se extrae el canal r de la imagen
+    umbral=6 # Se define el umbral
+    bin_image=bin_image>umbral# binarización del canal r con el umbral arbitrario
+    """plt.figure()
+    plt.imshow(bin_image,cmap="gray") #círculo bin
+    plt.show()"""
+    ancho,largo=len(bin_image),len(bin_image[0]) # dimensiones de la máscara binaria
+    recortada=image.copy()
+    # Obtención del ojo separado del fondo en imagen binaria
+    recortada[:,:,0],recortada[:,:,1],recortada[:,:,2]=recortada[:,:,0]*bin_image,recortada[:,:,1]*bin_image,recortada[:,:,2]*bin_image
+    mitad_arriba, mitad_abajo = bin_image[:ancho // 2, :], bin_image[ancho // 2:, :]
+    sobrantes_arriba, sobrantes_abajo = (len(mitad_arriba) - np.count_nonzero(np.count_nonzero(mitad_arriba, axis=1))), (len(mitad_abajo) - np.count_nonzero(np.count_nonzero(mitad_abajo, axis=1)))
+    mitad_izq, mitad_der = bin_image[:, :largo // 2], bin_image[:, largo // 2:]
+    sobrantes_izq, sobrantes_der = (len(mitad_izq[0]) - np.count_nonzero(np.count_nonzero(mitad_izq, axis=0))), (len(mitad_der[0]) - np.count_nonzero(np.count_nonzero(mitad_der, axis=0)))
+    temp=recortada
+    # Se recorta la imagen dependiendo de dónde lo requiera, si no hay lado que lo requiera no se corta
+    if sobrantes_der != 0:  # and sobrantes_izq == 0 and sobrantes_arriba == 0 and sobrantes_abajo == 0:
+        recortada = recortada[:, :-sobrantes_der]
+    if sobrantes_izq != 0:
+        recortada = recortada[:, sobrantes_izq:]
+        # recortada[sobrantes_arriba:-sobrantes_abajo, sobrantes_izq:-sobrantes_der]
+    if sobrantes_abajo != 0:  # (sobrantes_der==0 and sobrantes_izq==0): #or sobrantes_der == sobrantes_izq:
+        recortada = recortada[:-sobrantes_abajo, :]
+    if sobrantes_arriba != 0:  # or sobrantes_abajo == sobrantes_arriba:
+        recortada = recortada[sobrantes_arriba:, :]
+    """
+    plt.figure()
+    plt.imshow(recortada, cmap="gray")
+    plt.show()"""
+    if descript=="COLOR":
+        #PREPROCESAMIENTO COLOR
+        preprocesada=recortada
+        # Se pasa la imagen a cada espacio de color dependiendo del seleccionado
+        if espacio == "Lab":
+            preprocesada = color.rgb2lab(preprocesada)
+        elif espacio == "HSV":
+            preprocesada = color.rgb2hsv(preprocesada)
+        elif espacio == "Luv":
+            preprocesada = color.rgb2luv(preprocesada)
+
+        #MODELO COLOR
+        if histcolor=="concat":
+            espacio_canal1 = preprocesada[:, :, 0]  # se extraen canales de la imagen en el espacio de color indicado por parámetro
+            espacio_canal2 = preprocesada[:, :, 1]
+            espacio_canal3 = preprocesada[:, :, 2]
+            frec_canal1 = np.histogram(espacio_canal1.flatten(), bins=np.arange(0, 256,   1))  # a cada canal se le realiza un .flantten para trabajan con su vector al cual se le van a sacar las frecuencias de valores entre 0 y 255 con np.histogram
+            frec_canal2 = np.histogram(espacio_canal2.flatten(), bins=np.arange(0, 256, 1))
+            frec_canal3 = np.histogram(espacio_canal3.flatten(), bins=np.arange(0, 256, 1))
+            hist_prev = np.concatenate([frec_canal1[0], frec_canal2[0], frec_canal3[0]],      axis=None)  # se concatenan los arreglos de las frecuencias de cada canal con .concatenate
+            resp_descript = hist_prev / np.sum(hist_prev)
+        elif histcolor=="Joint":
+            bins=10
+            resp_descript=JointColorHistogram(preprocesada,num_bins=bins).flatten()
+
+    elif descript=="HOG":
+        #PREPROCESAMIENTO HOG
+        # Se definen los parámetros para el filtro gausiano
+        k_size = 63
+        sigma = 150
+        porcentaje_gris = round(256 * 0.5)
+        filtradoGauss = cv2.GaussianBlur(recortada, (k_size, k_size), sigma)
+        resta_medioloc = (recortada - filtradoGauss) + porcentaje_gris # calculo de la imagen con el 50% nivel de gris
+
+        preprocesada = transfo.resize(resta_medioloc, (512, 512)) # se redimensiona la imagen
+
+        '''plt.figure()
+        plt.imshow(preprocesada, cmap="gray")
+        plt.show() '''
+
+        #Se define el kernel y se hace apertura
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, ksize=(7, 7))
+        preprocesada = cv2.morphologyEx(preprocesada, cv2.MORPH_OPEN, kernel)
+
+        #MODELO HOG
+        pixels_per_cell2=30
+        #orientaciones=9
+        #cells_per_block=3
+        norm_block="L2-Hys"#"L2-Hys" #{‘L1’, ‘L1-sqrt’, ‘L2’, ‘L2-Hys’}
+        resp_descript = hog(preprocesada,block_norm=norm_block, pixels_per_cell=(pixels_per_cell2, pixels_per_cell2))#,orientations=orientaciones,cells_per_block=(cells_per_block,cells_per_block))
+
+    return resp_descript
+##
+# Se definen los parámetros del clasificador
+metodo = 'SVM'
+descriptor="HOG"
+espacio="HSV"
+tipohist="Joint"# Joint  concat
+nombremodeloSVM="SVM_HOG_30pxls_L2Hys_linear_apertura50.npy"#"INTENTOreplica3.npy" #"SVM_HOG_30pxls_L2Hys_linear_ngris50.npy"#"INTENTOreplica1.npy" #TODO cambiar cada vez que se corra modelo
+nombredescripts_train= "descripts_train"+nombremodeloSVM #"descripts_trainSVMHOG_mejor.npy"#"MIX_COLOR_HOG_train.npy"#"descripts_train"+nombremodeloSVM #"descripts_trainSVM_COLORJoint_HSV_sinpreproc_10bins.npy"#
+nombredescripts_val= "descripts_val"+nombremodeloSVM#"descripts_valSVMHOG_mejor.npy"#"MIX_COLOR_HOG_val.npy"#"descripts_val"+nombremodeloSVM #"descripts_valSVM_COLORJoint_HSV_sinpreproc_10bins.npy"#
+descripts=[]
+anotaciones=[]
+calculo=True
+carga=False
+##
+imagenes = glob.glob(os.path.join("BasedeDatos","Entrenamiento", "EntrenoM", "*.jpg"))
+for imagen in tqdm(imagenes):
+    if calculo==True:
+        descripts.append(crop_image(charge_imgs(imagen)[0], descript=descriptor,espacio=espacio,histcolor=tipohist))
+    anotaciones.append(charge_imgs(imagen)[1])
+
+if carga==False:
+    np.save(nombredescripts_train, descripts)
+else:
+    descripts=np.load(nombredescripts_train, "r")
+
+
+# Caso para SVM
+if metodo == 'SVM':
+    # Se definen parámetros
+    parametro_C = 1.0 #10
+    #degree_kpoly = 3
+    #p_gamma = "scale"  # gamma{‘scale’, ‘auto’} or float, default=’scale’ Kernel coefficient for ‘rbf’, ‘poly’ and ‘sigmoid’.
+    kernel_svm = 'linear'#'rbf'  # {‘linear’, ‘poly’, ‘rbf’, ‘sigmoid’, ‘precomputed’}
+    #random_state = None
+    #class_weight = None
+    # Se crea SVM y se le hace fit
+    entrenamiento_SVM = svm.SVC(kernel=kernel_svm, C=parametro_C).fit(descripts, anotaciones) #degree_kpoly=3, gamma=p_gamma,     #,degree=degree_kpoly, gamma=p_gamma, class_weight=class_weight, random_state=random_state)
+
+    # se guarda
+    pickle.dump(entrenamiento_SVM,
+                open(nombremodeloSVM, 'wb'))
+# Caso para RF
+elif metodo == 'RF':
+    # Se definen parámetros
+    randm_state = 0
+    n_estimators = 100
+    max_depth = None
+    #Se crea RF y se le hace fit
+    pre_entrenamiento_RF = ensemble.RandomForestClassifier(random_state=randm_state, n_estimators=n_estimators,
+                                                           max_depth=max_depth)
+    entrenamiento_RF = pre_entrenamiento_RF.fit(descripts, anotaciones)
+    # Se guarda
+    pickle.dump(pre_entrenamiento_RF, open(nombremodeloSVM, 'wb'))
+
+# Caso para NN
+elif metodo == "NN":
+    # Se definen parámetros
+    hidden_layers = (10, 30)
+    iters = 10000
+    lr = 0.00025
+    lr_var = 'adaptive'
+    #Se crea NN y se le hace fit
+    entrenamiento_NN = MLPClassifier(hidden_layer_sizes=hidden_layers, max_iter=iters, learning_rate_init=lr, learning_rate=lr_var).fit(descripts, anotaciones)
+    # Se guarda
+    pickle.dump(entrenamiento_NN, open("NN_default_HOGyPrec_mejor.npy", 'wb'))
+print("calculó modelo")
+
+descripts_valida=[]
+anotaciones_valida=[]
+imagenes = glob.glob(os.path.join("BasedeDatos", "Validacion", "ValidacionFINAL", "*.jpg"))
+
+for imagen in tqdm(imagenes):
+    if calculo==True:
+        descripts_valida.append(crop_image(charge_imgs(imagen)[0], descript=descriptor,espacio=espacio,histcolor=tipohist))
+    anotaciones_valida.append(charge_imgs(imagen)[1])
+
+if carga==False:
+    np.save(nombredescripts_val, descripts_valida)
+else:
+    descripts_valida=np.load(nombredescripts_val, "r")
+
+
+modelo = pickle.load(open("SVM_HOG_30pxls_L2Hys_linear_apertura50.npy", 'rb')) #
+predicciones = modelo.predict(descripts_valida)
+conf_mat = sk.confusion_matrix(anotaciones_valida, predicciones)
+precision = sk.precision_score(anotaciones_valida, predicciones, average="macro", zero_division=1)
+recall = sk.recall_score(anotaciones_valida, predicciones, average="macro", zero_division=1)
+f_score = sk.f1_score(anotaciones_valida, predicciones, average="macro")
+print(conf_mat)
+print(precision)
+print(recall)
+print(f_score)
+
+##
+descripts_test=[]
+anotaciones_test=[]
+imagenes = glob.glob(os.path.join("BasedeDatos", "PruebaFINAL", "*.jpg"))
+nombredescripts_test="descripts_test_modelofinal.npy"
+for imagen in tqdm(imagenes):
+    if calculo==True:
+        descripts_test.append(crop_image(charge_imgs(imagen)[0], descript=descriptor,espacio=espacio,histcolor=tipohist))
+    anotaciones_test.append(charge_imgs(imagen)[1])
+
+if carga==False:
+    np.save(nombredescripts_test, descripts_test)
+else:
+    descripts_valida=np.load(nombredescripts_test, "r")
+
+#Se carga y predice el modelo
+modelo = pickle.load(open("SVM_HOG_30pxls_L2Hys_linear_apertura50.npy", 'rb')) #
+predicciones = modelo.predict(descripts_test)
+#Se calcular e imprimen las métricas: precisión, recall y f-medida
+conf_mat = sk.confusion_matrix(anotaciones_test, predicciones)
+precision = sk.precision_score(anotaciones_test, predicciones, average="macro", zero_division=1)
+recall = sk.recall_score(anotaciones_test, predicciones, average="macro", zero_division=1)
+f_score = sk.f1_score(anotaciones_test, predicciones, average="macro")
+print(conf_mat)
+print(precision)
+print(recall)
+print(f_score)
+
+##
+#se defnen los nombre de los archivos  para entrenar
+nombredescripts_trainCOLOR= "descripts_trainSVM_COLORJoint_HSV_sinpreproc_10bins.npy"
+nombredescripts_trainhog="descripts_trainSVMHOG_mejor.npy"
+#Se cargan los descriptores para color y para HOG
+nombredescripts_trainCOLOR = np.load(nombredescripts_trainCOLOR, "r")
+nombredescripts_trainhog=np.load(nombredescripts_trainhog, "r")
+# Se combinan los descriptores y se guardan
+mix_descripts_train=np.append(nombredescripts_trainCOLOR,nombredescripts_trainhog,axis=1)
+np.save("MIX_COLOR_HOG_train.npy",mix_descripts_train)
+#se defnen los nombre de los archivos  para validar
+nombredescripts_trainCOLOR= "descripts_valSVM_COLORJoint_HSV_sinpreproc_10bins.npy"#
+nombredescripts_trainhog="descripts_valSVMHOG_mejor.npy"
+#Se cargan los descriptores para color y para HOG
+nombredescripts_trainCOLOR = np.load(nombredescripts_trainCOLOR, "r")
+nombredescripts_trainhog=np.load(nombredescripts_trainhog, "r")
+# Se combinan los descriptores y se guardan
+mix_descripts_train=np.append(nombredescripts_trainCOLOR,nombredescripts_trainhog,axis=1)
+np.save("MIX_COLOR_HOG_val.npy",mix_descripts_train)
